@@ -1,0 +1,52 @@
+---
+title: "Coastal Chum Pilot Study Notebook"
+output:
+  html_document:
+    df_print: paged
+    code_folding: hide
+    toc: true
+    toc_float: true
+    toc_collapsed: false
+---
+
+```{r, message=FALSE, warning=FALSE}
+require(tidyverse)
+require(knitr)
+require(magrittr)
+```
+
+# Readme
+
+This is an rstudio project. If you'd like to pre-rendered figures, read a summary of analysis and view code, please open the relevant html file in a browser. 
+
+The full project with data (except raw sequencing data) and results is archived as a github repository at [https://github.com/david-dayan/chum_coastal_pilot]
+
+
+# Rationale and Outline
+
+Here we conduct the analysis for the Oregon Coastal Chum Salmon Genetics Pilot Study (2019-2021) Oregon Department of Fish and Wildlife
+Conservation and Recovery Program using the Oke350 GTseq panel.
+
+This notebook contains analysis logs and results from the four objectives of this project:  
+(1)	Collect and analyze samples from the three largest coastal chum salmon populations (Nehalem, Tillamook, and Yaquina), and two additional basins (Siletz and Netarts) that often have a substantial number of spawners, to investigate genetic structure of coastal chum salmon populations.   
+(2)	Collect and analyze samples from two major Tillamook sub-basins (Kilchis and Miami) to investigate whether there is significant genetic structure within the basin.   
+(3)	Collect tissue samples from different anatomical locations of chum carcasses to investigate whether certain tissues are more likely to provide higher quality samples for analysis.  
+(4)	Analyze a small number of archival chum scale samples to evaluate the potential for investigating historical population structure, using the large number of chum scale samples ODFW has collected through spawning grounds surveys over time.  
+
+We also answer a lingering question from a previous sequencing run using these new data: why did so many samples fail in the panel optimization run?
+
+# Data Summary
+
+# Metadata/Populations
+
+# Genotyping Log
+
+# Population Genetic Structure
+
+# Tissue Sampling Issues
+
+## Panel optimization GT failure
+
+## Tissue Type
+
+## Archival Samples

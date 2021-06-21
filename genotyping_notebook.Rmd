@@ -1,0 +1,26 @@
+---
+title: "Coastal Chum Pilot Genotyping"
+output:
+  html_document:
+    df_print: paged
+    code_folding: hide
+    toc: true
+    toc_float: true
+    toc_collapsed: false
+---
+
+```{r, message=FALSE, warning=FALSE}
+require(tidyverse)
+require(knitr)
+require(magrittr)
+```
+
+# Readme
+
+This notebook is part of an rstudio project. If you'd like to pre-rendered figures, read a summary of analysis and view code, please open the relevant html file in a browser. 
+
+The full project with data (except raw sequencing data) and results is archived as a github repository at [https://github.com/david-dayan/chum_coastal_pilot]
+
+# Summary
+
+GTseq genotyping for the 2021 OR Coastal chum pilot study. [Analysis Notebook is here]()

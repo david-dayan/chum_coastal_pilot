@@ -33,9 +33,16 @@ GTseq genotyping for the 2021 OR Coastal chum pilot study. [Analysis Notebook is
 
 # Data
 
+Run 1:
+The first run was the test plate for the Oke350 panel. 
+Raw compressed reads are at /dfs/Omalley_Lab/dayan/coastal_chinook_2020/full_panel/demux/keta_reads . 
+
+95 samples library from four populations spiked into a larger coastal chinook run. Demuxed with deML. The total number of reads was 50,680,864 .
+
+Run 2:  
 Raw sequencing data is at /dfs/Omalley_Lab/dayan/chum_pilot_2021 and /dfs/Omalley_Lab/fitz/Runs/4774 . It was demultiplexed by the sequencing center
 
-Raw data is from the SFGL Illumina 020 run. 
+Raw data is from the SFGL Illumina 020 run and include some samples from run 1.  
 
 285 samples total
 
@@ -75,7 +82,7 @@ Other filtering:
 # Genotyping
 
 __Main Genotyper__  
-
+Note only run for the run 2 samples, run 1 already complete, will add in at compiler.
 ```{bash, eval = FALSE}
 ##### decompress script
 
@@ -127,6 +134,18 @@ perl $GTSEQ_GENO $PROBE_SEQS $INFILE > $OUTFILE
 #save this code chunk as a file on the server and submit this with qsub -q harold scriptname from the directory you want the output .genos files
 ```
 
+Here copied the genos files from run 1 into the directory.
+
+```{bash, eval = FALSE}
+# rename all the run 1 genos file to reflect run
+for file in *.genos; do
+    mv "$file" "${file%.genos}_run1.genos"
+done
+
+# move to main genos directory
+```
+
+
 ```{bash, eval = FALSE}
 SGE_Batch -q harold -r compile -c 'perl /dfs/Omalley_Lab/dayan/software/GTseq-Pipeline/GTseq_GenoCompile_v3.pl > Oke_2021_coastal_genos_0.1.csv'
 
@@ -177,11 +196,11 @@ Nope, looks good to go.
 
 ### Replicates
 
-Some samples were replicated, let's check for concordance in the genotypes, the pick the sample with better GT success and throw out the duplicate.
+Some samples were replicated, both within and acorss runs let's check for concordance in the genotypes, the pick the sample with better GT success and throw out the duplicate.
 
 ```{r, cache=TRUE, warning=FALSE, message=FALSE}
 #LOCAL R
-# Some samples were actually run in triplicate which completely broke the script below
+# Some samples were actually run in triplicateor quadrupled which completely broke the script below
 # lets get rid of those
 
 # here we filter out our known controls and create our next dataset genos_0.11
@@ -191,13 +210,13 @@ genos_0.11 <- genos_0.1 %>%
 genos_0.11 %<>%
   mutate(sample_simple = str_extract(Sample, "[:upper:][:lower:]{2}[AJCU][RC]\\d{2}\\w{4}_\\d{4}"))
 
-#find the triplicate samples, and remove just one of each (lowest on target)
+#find the triplicate (or more) samples, and keep the two with greatest on target read dpeth
 count(genos_0.11, sample_simple) %>%
   arrange(desc(n))
  
 genos_0.11 %<>% 
-  filter(Sample != "OkeCC19NEHR_0001_CAAACC_TTTGTC_S192_R1_001") %>%
-  filter(Sample != "OkeCC19TILR_0019_CTGATA_TCCTGC_S255_R1_001")
+  group_by(sample_simple) %>%
+  slice_max(order_by = `On-Target Reads`, n = 2)
 
 #now let's get duplicated samples
 dups <- genos_0.11[genos_0.11$sample_simple %in% genos_0.11$sample_simple[duplicated(genos_0.11$sample_simple)],]
@@ -259,6 +278,7 @@ genos_0.2 %<>%
 count(genos_0.2, pop)
 ```
 
+Note that 10 of the archival scale samples (in metadata) weren't included in the library. So there is a discrepancy between the unfiltered genotype sample size and the metadata sample size.
 
 ## IFI and Missingness
 
@@ -275,7 +295,7 @@ missing$marker <- row.names(missing)
 ggplot(missing) + geom_histogram(aes(x=missingness))+geom_vline(aes(xintercept= 0.2), color="red")+geom_vline(aes(xintercept= 0.1), color="blue")+theme_classic()+xlab("missingness (loci)")
 ```
 
-Now let's make the datasets. The first step is to collect some information about genotying success from the .genos files. We'll do this with an awk one liner.  
+Doesn't look as great as normal, but that makes sense given that it's chum samples. Now let's make the datasets. The first step is to collect some information about genotying success from the .genos files. We'll do this with an awk one liner.  
 
 The script below will pull the allele count ratios and read counts for all individuals in the pipeline
 ```{bash, eval = FALSE}
@@ -386,19 +406,19 @@ __0.4 Second Iteration Filter__
 
 Next we do the same process, but at the final filtering levels:
 
-- IFI_cutoff=2.5  
-- GTperc_cutoff=90 (inds greater than 10% missing data excluded)  
+- IFI_cutoff=5  
+- GTperc_cutoff=80 (inds greater than 10% missing data excluded)  
 - Missingness (loci) > 20%
 
 ```{r}
 #print table of bad missingness individual
 kable(genos_0.3 %>%
-  filter(`%GT` < 90) %>%
+  filter(`%GT` < 80) %>%
     select(1:6), caption = "Individuals with high missingess (>10% missing data)")
 
 # now remove them
 genos_0.4 <- genos_0.3 %>%
-  filter(`%GT` > 90)
+  filter(`%GT` > 80)
 
 #now recalculate locus level missingness after removing the worst individuals
   
@@ -450,18 +470,18 @@ genos_0.4 <- genos_0.4 %>%
 # now filter on IFI
 #print table of bad IFI samples
 kable(genos_0.4 %>%
-  filter(IFI >2.5) %>%
-    select(2:7), caption = "High IFI (>2.5) samples (low confidence barcodes)")
+  filter(IFI >5) %>%
+    select(1:6), caption = "High IFI (>5) samples (low confidence barcodes)")
 
 #update the  dataset
 genos_0.4 <- genos_0.4 %>%
-  filter(IFI < 2.5)
+  filter(IFI < 5)
 
 ```
 
-43 individuals with %GT < 90%
+8 individuals with %GT < 90%
 2 markers with > 20% missing data
-0 high IFI
+1 high IFI
 
 ## Paralogs
 
@@ -551,7 +571,7 @@ genos_1.0 <- genos_0.5 %>%
   select_if(~ length(unique(.)) > 1)
 ```
 
-10 monomorphic markers removed
+4 monomorphic markers removed
 
 
 # File Conversion and Stats
@@ -594,9 +614,9 @@ ggplot(genos_2.0)+geom_density(aes(x=on_target_final/`Raw Reads`))+geom_vline(ae
 ```
 
 __Stats of final filterd data set__  
-134 individuals X 320 Markers  
-Depths: Mean-1422, median-1050, sd-1321  
-% On Target: 25.4% (i.e 25.4% of the total number of reads from individuals in the final dataset contribute to called genotypes) 
+
+235 individuals X 325 Markers  
+Depths: Mean-934, median-448, sd-1150 
 
 
 
@@ -617,7 +637,7 @@ Here's adegenet's genind object
 genos_2.1 <- genos_2.0
 colnames(genos_2.1) <- gsub("\\.", "_", colnames(genos_2.1))
 #convert to matrix with inds as row names
-genos_2.1 <- as.matrix(genos_2.1[,c(7:326)]) #caution hardcoding, make sure you select just your marker columns
+genos_2.1 <- as.matrix(genos_2.1[,c(7:331)]) #caution hardcoding, make sure you select just your marker columns
 row.names(genos_2.1) <- genos_2.0$sample_simple
 genind_1.0 <- df2genind(genos_2.1, sep ="", ploidy=2,NA.char = "0")
 
@@ -635,7 +655,7 @@ Finally, save your files as R objects for further analysis.
 
 genos_2.0 %<>%
   relocate(sample_simple, pop) %>%
-  select(-c(Sample, adapter, on_target_final))
+  select(-c(Sample, on_target_final))
 
 
 genos_2.0 %<>%

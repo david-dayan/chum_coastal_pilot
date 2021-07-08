@@ -1,0 +1,254 @@
+sample	tissue_type_raw	tissue_type
+OkeCC19MILC_0035	caudal fin punch	fin
+OkeCC19MILC_0032	caudal region muscle	muscle
+OkeCC19MILC_0031	caudal region muscle	muscle
+OkeCC19NETR_0024	cheek muscle	muscle
+OkeCC19MILC_0037	eggs	eggs
+OkeCC19MILC_0038	gill material	gill
+OkeCC19NETR_0004	inner head	inner head
+OkeCC19NETR_0005	"inner head, eye socket"	inner head
+OkeCC19MILC_0018	interior body cavity muscle	muscle
+OkeCC19MILC_0010	interior body cavity muscle	muscle
+OkeCC19YAQR_0075	muscle from cut caudal peduncle	muscle
+OkeCC19NETR_0015	muscle posterior to operculum	muscle
+OkeCC19MILC_0048	muscle posterior to operculum	muscle
+OkeCC19MILC_0040	muscle posterior to operculum	muscle
+OkeCC19MILC_0029	muscle posterior to operculum	muscle
+OkeCC19MILC_0028	muscle posterior to operculum	muscle
+OkeCC19MILC_0026	muscle posterior to operculum	muscle
+OkeCC19MILC_0024	muscle posterior to operculum	muscle
+OkeCC19MILC_0023	muscle posterior to operculum	muscle
+OkeCC19MILC_0022	muscle posterior to operculum	muscle
+OkeCC19MILC_0021	muscle posterior to operculum	muscle
+OkeCC19MILC_0017	muscle posterior to operculum	muscle
+OkeCC19MILC_0016	muscle posterior to operculum	muscle
+OkeCC19MILC_0013	muscle posterior to operculum	muscle
+OkeCC19MILC_0009	muscle posterior to operculum	muscle
+OkeCC19MILC_0008	muscle posterior to operculum	muscle
+OkeCC19MILC_0005	muscle posterior to operculum	muscle
+OkeCC19MILC_0004	muscle posterior to operculum	muscle
+OkeCC19MILC_0003	muscle posterior to operculum	muscle
+OkeCC19MILC_0052	muscle posterior to operculum	muscle
+OkeCC19MILC_0053	muscle posterior to operculum	muscle
+OkeCC19MILC_0059	muscle posterior to operculum	muscle
+OkeCC19MILC_0065	muscle posterior to operculum	muscle
+OkeCC19YAQR_0071	muscle posterior to operculum	muscle
+OkeCC19YAQR_0072	muscle posterior to operculum	muscle
+OkeCC19NETR_0001	operculum punch	operculum punch
+OkeCC19NETR_0002	operculum punch	operculum punch
+OkeCC19NETR_0003	operculum punch	operculum punch
+OkeCC19NETR_0006	operculum punch	operculum punch
+OkeCC19NETR_0007	operculum punch	operculum punch
+OkeCC19NETR_0009	operculum punch	operculum punch
+OkeCC19NETR_0010	operculum punch	operculum punch
+OkeCC19NETR_0011	operculum punch	operculum punch
+OkeCC19NETR_0012	operculum punch	operculum punch
+OkeCC19NETR_0013	operculum punch	operculum punch
+OkeCC19NETR_0014	operculum punch	operculum punch
+OkeCC19NETR_0016	operculum punch	operculum punch
+OkeCC19NETR_0017	operculum punch	operculum punch
+OkeCC19NETR_0018	operculum punch	operculum punch
+OkeCC19NETR_0019	operculum punch	operculum punch
+OkeCC19NETR_0020	operculum punch	operculum punch
+OkeCC19NETR_0021	operculum punch	operculum punch
+OkeCC19NETR_0022	operculum punch	operculum punch
+OkeCC19NETR_0023	operculum punch	operculum punch
+OkeCC19NETR_0025	operculum punch	operculum punch
+OkeCC19MILC_0047	operculum punch	operculum punch
+OkeCC19MILC_0046	operculum punch	operculum punch
+OkeCC19MILC_0044	operculum punch	operculum punch
+OkeCC19MILC_0042	operculum punch	operculum punch
+OkeCC19MILC_0041	operculum punch	operculum punch
+OkeCC19MILC_0039	operculum punch	operculum punch
+OkeCC19MILC_0034	operculum punch	operculum punch
+OkeCC19MILC_0033	operculum punch	operculum punch
+OkeCC19MILC_0030	operculum punch	operculum punch
+OkeCC19MILC_0027	operculum punch	operculum punch
+OkeCC19MILC_0025	operculum punch	operculum punch
+OkeCC19MILC_0020	operculum punch	operculum punch
+OkeCC19MILC_0019	operculum punch	operculum punch
+OkeCC19MILC_0015	operculum punch	operculum punch
+OkeCC19MILC_0014	operculum punch	operculum punch
+OkeCC19MILC_0012	operculum punch	operculum punch
+OkeCC19MILC_0011	operculum punch	operculum punch
+OkeCC19MILC_0007	operculum punch	operculum punch
+OkeCC19MILC_0002	operculum punch	operculum punch
+OkeCC19MILC_0001	operculum punch	operculum punch
+OkeCC19MILC_0054	operculum punch	operculum punch
+OkeCC19MILC_0055	operculum punch	operculum punch
+OkeCC19MILC_0056	operculum punch	operculum punch
+OkeCC19MILC_0057	operculum punch	operculum punch
+OkeCC19MILC_0058	operculum punch	operculum punch
+OkeCC19MILC_0060	operculum punch	operculum punch
+OkeCC19MILC_0061	operculum punch	operculum punch
+OkeCC19MILC_0062	operculum punch	operculum punch
+OkeCC19MILC_0063	operculum punch	operculum punch
+OkeCC19MILC_0064	operculum punch	operculum punch
+OkeCC19YAQR_0069	operculum punch	operculum punch
+OkeCC19YAQR_0068	operculum punch	operculum punch
+OkeCC19YAQR_0066	operculum punch	operculum punch
+OkeCC19YAQR_0073	operculum punch	operculum punch
+OkeCC19YAQR_0074	operculum punch	operculum punch
+OkeCC19MILC_0006	operculum punch and gill tissue	multiple
+OkeCC19YAQR_0067	"operculum punch, caudal fin punch"	multiple
+OkeCC19YAQR_0070	"operculum punch, caudal fin punch"	multiple
+OkeCC19NETR_0008	"operculum punch, dorsal clip"	multiple
+OkeCC19NETR_0026	"operculum punch, dorsal clip"	multiple
+OkeCC19SILR_0003	Pectoral	fin
+OkeCC19SILR_0001	Pelvic	fin
+OkeCC19SILR_0002	Pelvic	fin
+OkeCC19MILC_0045	pelvic fin punch	fin
+OkeCC19MILC_0043	pelvic fin punch	fin
+OkeCC19MILC_0036	posterior of head	unknown
+OkeCC19MILC_0050		
+OkeCC19MILC_0049		
+OkeCC19NEHR_0001		
+OkeCC19NEHR_0002		
+OkeCC19NEHR_0003		
+OkeCC19NEHR_0004		
+OkeCC19NEHR_0005		
+OkeCC19NEHR_0006		
+OkeCC19NEHR_0007		
+OkeCC19NEHR_0008		
+OkeCC19NEHR_0009		
+OkeCC19NEHR_0010		
+OkeCC19NEHR_0011		
+OkeCC19NEHR_0012		
+OkeCC19NEHR_0013		
+OkeCC19NEHR_0014		
+OkeCC19NEHR_0015		
+OkeCC19NEHR_0016		
+OkeCC19NEHR_0017		
+OkeCC19NEHR_0018		
+OkeCC19NEHR_0019		
+OkeCC19NEHR_0020		
+OkeCC19NEHR_0021		
+OkeCC19NEHR_0022		
+OkeCC19NEHR_0023		
+OkeCC19NEHR_0024		
+OkeCC19NEHR_0025		
+OkeCC19NEHR_0026		
+OkeCC19NEHR_0027		
+OkeCC19NEHR_0028		
+OkeCC19NEHR_0029		
+OkeCC19NEHR_0030		
+OkeCC19NEHR_0031		
+OkeCC19NEHR_0032		
+OkeCC19NEHR_0033		
+OkeCC19NEHR_0034		
+OkeCC19NEHR_0035		
+OkeCC19NEHR_0036		
+OkeCC19NEHR_0037		
+OkeCC19NEHR_0038		
+OkeCC19NEHR_0039		
+OkeCC19NEHR_0040		
+OkeCC19NEHR_0041		
+OkeCC19NEHR_0042		
+OkeCC19NEHR_0043		
+OkeCC19NEHR_0044		
+OkeCC19NEHR_0045		
+OkeCC19NEHR_0046		
+OkeCC19NEHR_0047		
+OkeCC19NEHR_0048		
+OkeCC19NEHR_0049		
+OkeCC19NEHR_0050		
+OkeCC19TILR_0001		
+OkeCC19TILR_0002		
+OkeCC19TILR_0003		
+OkeCC19TILR_0004		
+OkeCC19TILR_0005		
+OkeCC19TILR_0006		
+OkeCC19TILR_0007		
+OkeCC19TILR_0008		
+OkeCC19TILR_0009		
+OkeCC19TILR_0010		
+OkeCC19TILR_0011		
+OkeCC19TILR_0012		
+OkeCC19TILR_0013		
+OkeCC19TILR_0014		
+OkeCC19TILR_0015		
+OkeCC19TILR_0016		
+OkeCC19TILR_0017		
+OkeCC19TILR_0018		
+OkeCC19TILR_0019		
+OkeCC19TILR_0020		
+OkeCC19TILR_0021		
+OkeCC19TILR_0022		
+OkeCC19TILR_0023		
+OkeCC19TILR_0024		
+OkeCC19TILR_0025		
+OkeCC19TILR_0026		
+OkeCC19TILR_0027		
+OkeCC19TILR_0028		
+OkeCC19TILR_0029		
+OkeCC19TILR_0030		
+OkeCC19TILR_0031		
+OkeCC19TILR_0032		
+OkeCC19TILR_0033		
+OkeCC19TILR_0034		
+OkeCC19TILR_0035		
+OkeCC19TILR_0036		
+OkeCC19TILR_0037		
+OkeCC19TILR_0038		
+OkeCC19TILR_0039		
+OkeCC19TILR_0040		
+OkeCC19TILR_0041		
+OkeCC19TILR_0042		
+OkeCC19TILR_0043		
+OkeCC19TILR_0044		
+OkeCC19TILR_0045		
+OkeCC19TILR_0046		
+OkeCC19TILR_0047		
+OkeCC19TILR_0048		
+OkeCC19TILR_0049		
+OkeCC19TILR_0050		
+OkeCC19TILR_0101		
+OkeCC19TILR_0102		
+OkeCC19TILR_0103		
+OkeCC19TILR_0104		
+OkeCC19TILR_0105		
+OkeCC19TILR_0106		
+OkeCC19TILR_0107		
+OkeCC19TILR_0108		
+OkeCC19TILR_0109		
+OkeCC19TILR_0110		
+OkeCC19TILR_0111		
+OkeCC19TILR_0112		
+OkeCC19TILR_0113		
+OkeCC19TILR_0114		
+OkeCC19TILR_0115		
+OkeCC19TILR_0116		
+OkeCC19TILR_0117		
+OkeCC19TILR_0118		
+OkeCC19TILR_0119		
+OkeCC19TILR_0120		
+OkeCC19TILR_0121		
+OkeCC19TILR_0122		
+OkeCC19TILR_0123		
+OkeCC19TILR_0124		
+OkeCC19TILR_0125		
+OkeCC19TILR_0126		
+OkeCC19TILR_0127		
+OkeCC19TILR_0128		
+OkeCC19TILR_0129		
+OkeCC19TILR_0130		
+OkeCC19TILR_0131		
+OkeCC19TILR_0132		
+OkeCC19TILR_0133		
+OkeCC19TILR_0134		
+OkeCC19TILR_0135		
+OkeCC19TILR_0136		
+OkeCC19TILR_0137		
+OkeCC19TILR_0138		
+OkeCC19TILR_0139		
+OkeCC19TILR_0140		
+OkeCC19TILR_0141		
+OkeCC19TILR_0142		
+OkeCC19TILR_0143		
+OkeCC19TILR_0144		
+OkeCC19TILR_0145		
+OkeCC19TILR_0146		
+OkeCC19TILR_0147		
+OkeCC19TILR_0148		
+OkeCC19TILR_0149		
+OkeCC19TILR_0150		

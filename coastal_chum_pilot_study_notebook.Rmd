@@ -10,6 +10,16 @@ output:
 ---
 
 ```{r, message=FALSE, warning=FALSE}
+require(adespatial)
+require(rubias)
+require(hierfstat)
+require(scico)
+require(ade4)
+require(marmap)
+require(vegan)
+require(ggmap)
+require(pegas)
+require(adegenet)
 require(tidyverse)
 require(knitr)
 require(magrittr)
@@ -17,7 +27,7 @@ require(magrittr)
 
 # Readme
 
-This is an rstudio project. If you'd like to pre-rendered figures, read a summary of analysis and view code, please open the relevant html file in a browser. 
+This notebook is part of an rstudio project. If you'd like to pre-rendered figures, read a summary of analysis and view code, please open the relevant html file in a browser. 
 
 The full project with data (except raw sequencing data) and results is archived as a github repository at [https://github.com/david-dayan/chum_coastal_pilot]
 
@@ -37,16 +47,1106 @@ We also answer a lingering question from a previous sequencing run using these n
 
 # Data Summary
 
-# Metadata/Populations
+__Sequencing Data__
 
-# Genotyping Log
+Run 1:  
+The first run was the test plate for the Oke350 panel. 
+Raw compressed reads are at /dfs/Omalley_Lab/dayan/coastal_chinook_2020/full_panel/demux/keta_reads . 
+
+95 samples library from four populations spiked into a larger coastal chinook run. Demuxed with deML. The total number of reads was 50,680,864 .
+
+
+
+Run 2:  
+Raw sequencing data is at /dfs/Omalley_Lab/dayan/chum_pilot_2021 and /dfs/Omalley_Lab/fitz/Runs/4774 . It was demultiplexed by the sequencing center
+
+Raw data is from the SFGL Illumina 020 run. 
+
+285 samples total (including controls, replicates and samples from run 1 that required resequencing)
+
+Intermediate data/results are in the directory /dfs/Omalley_Lab/dayan/chum_pilot_2021
+
+__Samples__
+
+Before filtering (duplicates removed) there were 209 samples, sample size per basin and spawning tributary (if available) is below.
+```{r, message=FALSE, warning=FALSE}
+meta_data <- readxl::read_xlsx("metadata/Oke GT-seq runs.xlsx", sheet = 6)
+
+#note here that some samples in the genotype data were missing from the metadata ("OkeCC19MILC_0001" "OkeCC19NEHR_0001" "OkeCC19TILR_0102"), the data was available from other sources, manually added them to the "combined" on the metadata xslx.
+
+kable(meta_data %>% count(basin, detailed_location))
+map_data <- meta_data %>%
+  select(basin, detailed_location, lon, lat)
+
+bound_box <- make_bbox(lon = c(-123,-125), lat = map_data$lat, f = .2)
+map <- get_map(location = bound_box, maptype = "terrain", source = "google", zoom = 8)
+ggmap(map) + geom_point(data = map_data, aes(x = lon, y = lat), color = "red")+ geom_text(data = distinct(map_data, basin, .keep_all = TRUE), aes(label = basin ), hjust = 1.2)
+
+ggmap(map) + geom_point(data = map_data, aes(x = lon, y = lat), color = "red")+ geom_text(data = distinct(arrange(map_data, desc(lat)), basin, .keep_all = TRUE), aes(label = basin ), hjust = 1.2)+xlab("")+ylab("")
+```
+
+Note here that the number of Mill Creek samples is 10 greater than reflected in the sample summary from raw genotype data because 10 archival scale samples were not included in the library.
+
+__Genotype Data__  
+Detailed log of genotyping (raw reads to filtered genotypes) is available in a [R notebook](https://github.com/david-dayan/chum_coastal_pilot/blob/main/genotyping_notebook.html)
+
+The final filtered dataset includes 235 individuals and 325 markers. Basin and subbasin sample sizes after filtering are below
+
+```{r, message=FALSE, warning=FALSE}
+#note here we also unify the metadata and population names
+load("genotype_data/genind_2.0.R")
+load("genotype_data/genotypes_2.2.R")
+
+genos_2.0 %<>%
+  left_join(meta_data)
+
+
+genind_2.0@pop <- as.factor(genos_2.0$basin)
+
+kable(genos_2.0 %>%
+  group_by(basin, detailed_location) %>%
+  summarise(n = n(), missing_data = mean((100-`%GT`)/100))
+)
+
+kable(genos_2.0 %>%
+  group_by(basin) %>%
+  summarise(n = n(), missing_data = mean((100-`%GT`)/100))
+)
+```
+
 
 # Population Genetic Structure
+
+## PCA
+
+First let's took a look at the data in PC space.
+
+```{r, message=FALSE, warning=FALSE, cache = TRUE}
+X <- scaleGen(genind_2.0, NA.method="mean")
+
+
+#then run pca
+pca1 <- dudi.pca(X, scale = FALSE, scannf = FALSE, nf = 325)
+
+#check pcs to keep with kaiser-guttman
+
+#kaiser guttman
+cutoff<-mean(pca1$eig)
+kg <- length((pca1$eig)[(pca1$eig)>cutoff])
+barplot(pca1$eig, main = "PCA eigenvalues")
+abline(h = cutoff, col = "red")
+
+
+#broken stick
+n <- length(pca1$eig)
+bsm <- data.frame(j=seq(1:n), p = 0)
+bsm$p[1] <- 1/n
+for (i in 2:n){
+  bsm$p[i] <- bsm$p[i-1]+(1/(n+1-i))
+  
+}
+bsm$p <- 100*bsm$p/n
+
+pca_eigs_to_plot <- as.data.frame(cbind(100*pca1$eig/sum(pca1$eig)), rev(bsm$p))
+pca_eigs_to_plot %<>%
+  rownames_to_column(var = "bsm") %>%
+  rename(pca_eig_perc = V1) %>%
+  mutate(pca_eig_perc = as.numeric(pca_eig_perc))
+  
+
+
+
+#kept all PCs
+snp_pcs <- pca1$li#[,c(1:kg)]
+
+#now plot data
+snp_pcs %<>%
+  rownames_to_column("sample") %>%
+  left_join(meta_data)
+
+ggplot(data = snp_pcs)+geom_point(aes(Axis1, Axis2, color = basin)) + stat_ellipse(aes(Axis1, Axis2, color = basin)) +theme_classic()+scale_color_scico_d()
+ggplot(data = snp_pcs)+geom_point(aes(Axis1, Axis3, color = basin)) + stat_ellipse(aes(Axis1, Axis2, color = basin)) +theme_classic()+scale_color_scico_d()
+
+
+#s.class(pca1$li, as.factor(snp_pcs$basin),xax=1,yax=2, col=transp(viridisLite::viridis(6),0.7), axesell=FALSE, cstar=0, cpoint=1, grid=FALSE)
+#add.scatter.eig(pca1$eig[1:10],nf=3,xax=1,yax=2, posi = "bottomright" )
+
+#3d plot as well
+plotly::plot_ly(x=snp_pcs$Axis1, y=snp_pcs$Axis2, z=snp_pcs$Axis3, type="scatter3d", mode="markers", color=snp_pcs$basin, alpha = 0.8)
+
+#and plot by approx distance
+ggplot(data = snp_pcs)+geom_point(aes(Axis1, Axis2, color = lat)) +theme_classic()+scale_color_viridis_c()
+ggplot(data = snp_pcs)+geom_point(aes(Axis1, Axis3, color = lat)) +theme_classic()+scale_color_viridis_c()
+
+plotly::plot_ly(x=snp_pcs$Axis1, y=snp_pcs$Axis2, z=snp_pcs$Axis3, type="scatter3d", mode="markers", color=snp_pcs$lat, alpha = 0.8, colors = )
+
+
+# publication plot (with bsm_+kaiser guttman criteria)
+a <- ggplot(data = snp_pcs)+geom_point(aes(Axis1, Axis2, color = basin), alpha = 0.5) + stat_ellipse(aes(Axis1, Axis2, color = basin)) +theme_classic()+scale_color_scico_d(name= "Basin")+xlab("PC1\n2.1% of variance")+ylab("PC1\n1.7% of variance")
+
+pca_eigs_to_plot %<>%
+  rowid_to_column("row_n") %>%
+  mutate(bsm = as.numeric(bsm)) %>%
+  pivot_longer(!row_n, names_to = "bsm_or_eig", values_to = "percent_variance")
+
+ggplot(data = pca_eigs_to_plot[1:10,])+geom_bar(aes(x = as.factor(row_n), y = percent_variance, color = bsm_or_eig, fill = bsm_or_eig), stat = "identity", position=position_dodge())+theme_bw()
+
+
+inset_scree <- pca_eigs_to_plot[1:16,] %>%
+  filter( bsm_or_eig == "pca_eig_perc") %>%
+  mutate(fillcolor = case_when(row_n < 3 ~ "a",
+                               TRUE ~"b"))
+
+
+b <- ggplot(data = inset_scree)+geom_bar(aes(x = as.factor(row_n), y = percent_variance,  fill = fillcolor), stat = "identity", position=position_dodge())+theme_classic()+theme(legend.position = "none", axis.title.x = element_blank(), axis.title.y = element_blank(), axis.text = element_blank(), axis.ticks = element_blank())+scale_fill_manual(values = c( "grey15", "grey67"))
+
+cowplot::ggdraw(a ) +
+  cowplot::draw_plot(b, 0.1, 0.7, .25, .25)
+```
+
+__PCA IBD__
+There appears to be rough relationship between latitude and PC1 score, but this may be due to Yaquina vs all other structure (Coos is furthest south yet intermediate PC scores). We will formally examine IBD using mantel tests and spatial eigenalysis later, lets just quickly plot it
+
+```{r, message=FALSE}
+ggplot(data = snp_pcs)+geom_point(aes(lat, Axis1, color = basin))+geom_smooth(aes( lat, Axis1))+theme_bw()+scale_color_scico_d()
+```
+
+
+__Sub-basin structure__
+We should also examine for sub-basin structure. Let's compare Miami to Kilchis Rivers.   
+First do they vary along the primary axis of variation found among all samples (PC1)?
+```{r, warning=FALSE, message=FALSE}
+ggplot(data = filter(snp_pcs, basin == "Tillamook"))+geom_point(aes(Axis1, Axis2, color = detailed_location)) +theme_classic()+scale_color_scico_d(begin = 0.2, end = 0.8)
+
+#ggplot(data = filter(snp_pcs, basin == "Yaquina"))+geom_point(aes(Axis1, Axis2, color = detailed_location)) +theme_classic()+scale_color_scico_d(begin = 0.2, end = 0.8)
+```
+
+No, but, these populations may vary along a different axis (i.e. sub-basin structure may not reflect a smaller degree of separation along the same genetic axis). We could search for smaller PCs where the centroid varies across these two groups, or much easier for now, just conduct their own PCA.
+
+```{r}
+Xtill <- scaleGen(seppop(genind_2.0)$Tillamook, NA.method="mean")
+
+
+#then run pca
+pca_till <- dudi.pca(Xtill, scale = FALSE, scannf = FALSE, nf = 320)
+
+#check pcs to keep with kaiser-guttman
+
+#kaiser guttman
+cutoff<-mean(pca_till$eig)
+kg <- length((pca_till$eig)[(pca_till$eig)>cutoff])
+barplot(pca_till$eig, main = "PCA eigenvalues")
+abline(h = cutoff, col = "red")
+
+#kept all PCs
+snp_pcs_till <- pca_till$li#[,c(1:kg)]
+
+#now plot data
+snp_pcs_till %<>%
+  rownames_to_column("sample") %>%
+  left_join(meta_data)
+
+ggplot(data = snp_pcs_till)+geom_point(aes(Axis1, Axis2, color = detailed_location)) + stat_ellipse(aes(Axis1, Axis2, color = detailed_location)) +theme_classic()+scale_color_scico_d(begin = 0.2, end = 0.8)
+ggplot(data = snp_pcs_till)+geom_point(aes(Axis1, Axis3, color = detailed_location)) + stat_ellipse(aes(Axis1, Axis2, color = detailed_location)) +theme_classic()+scale_color_scico_d(begin = 0.2, end = 0.8)
+# 
+# Xyaq <- scaleGen(seppop(genind_2.0)$Yaquina, NA.method="mean")
+# 
+# 
+# #then run pca
+# pca_yaq <- dudi.pca(Xyaq, scale = FALSE, scannf = FALSE, nf = 320)
+# 
+# #check pcs to keep with kaiser-guttman
+# 
+# #kaiser guttman
+# cutoff<-mean(pca_yaq$eig)
+# kg <- length((pca_yaq$eig)[(pca_yaq$eig)>cutoff])
+# barplot(pca_yaq$eig, main = "PCA eigenvalues")
+# abline(h = cutoff, col = "red")
+# 
+# #kept all PCs
+# snp_pcs_yaq <- pca_yaq$li#[,c(1:kg)]
+# 
+# #now plot data
+# snp_pcs_yaq %<>%
+#   rownames_to_column("sample") %>%
+#   left_join(meta_data)
+# 
+# ggplot(data = snp_pcs_yaq)+geom_point(aes(Axis1, Axis2, color = detailed_location)) + stat_ellipse(aes(Axis1, Axis2, color = detailed_location)) +theme_classic()+scale_color_scico_d(begin = 0.2, end = 0.8)
+# ggplot(data = snp_pcs_yaq)+geom_point(aes(Axis1, Axis3, color = detailed_location)) + stat_ellipse(aes(Axis1, Axis2, color = detailed_location)) +theme_classic()+scale_color_scico_d(begin = 0.2, end = 0.8)
+```
+
+Nope, very little difference in group centroids along the first two PCs in either Yaquina or Tillamook basins.
+
+
+
+__PCA Results Summary__
+
+The first 33 PCs are significant according to the Kaiser-Guttman criteria, however, an ad-hoc/by eye examination suggests only the first PC is revealing any real structure in the data. This first PC largely separates Yaquina from the rest of the samples. There is a relationship between latitude and PC1 scores, suggestive of IBD, but it may be driven by the large difference between the Yaquina and other samples, especially considering that Coos River samples demonstrate intermediate PC values despite being on the extreme south of the sampling area.
+
+## Diversity Metrics
+
+### Heterozygosity
+
+Let's examine patterns of heterozygosity and diversity next.
+
+```{r, cache=TRUE, warning=FALSE, message=FALSE}
+n.pop <- seppop(genind_2.0)
+
+hobs <- lapply(n.pop, function(x) (summary(x)$Hobs))
+hobs <- as.data.frame(t(do.call(rbind, hobs)))
+hobs <- hobs %>%
+  rownames_to_column(var="marker")
+hobs <- hobs %>%
+  pivot_longer(-marker, names_to = "basin", values_to = "Ho")
+#ggplot(hobs)+geom_boxplot(aes(x=pop, y=hobs))+theme_classic()+xlab("Run Timing")+ylab("Observed Heterozygosity")
+
+hexp <- lapply(n.pop, function(x) (summary(x)$Hexp))
+hexp <- as.data.frame(t(do.call(rbind, hexp)))
+hexp <- hexp %>%
+  rownames_to_column(var="marker") %>%
+  pivot_longer(-marker, names_to = "basin", values_to = "He")
+
+marker_divs <- hexp %>%
+  left_join(hobs) %>%
+  pivot_longer(c("Ho", "He"), names_to = "obs_exp", values_to ="H")
+
+H_summary <- count(genos_2.0, basin)
+
+#plot
+ggplot(data=marker_divs)+geom_boxplot(aes(x=basin, y=H, fill = obs_exp))+theme_classic()+geom_text(data = H_summary,aes(basin, Inf, label = paste0("n = ", n), vjust = 1))+scale_fill_scico_d(begin = 0.2, end = 0.8, palette ="batlow", name = "")
+
+#table
+marker_divs %>%
+  group_by(basin, obs_exp) %>%
+  summarise(mean = mean(H))
+  
+#spatial pattern?
+#spatial_he <- marker_divs %>%
+#   group_by(basin, obs_exp) %>%
+#  filter(obs_exp == "He") %>%
+#   summarise(mean = mean(H)) %>%
+#  left_join(sites)
+#summary(aov(data = spatial_he, mean~lat))
+```
+
+__Significance Testing__  
+Are these differences between populations significant? To test with the same number of loci (across populations) we'll use a monte-carlo test and 999 permutations.
+
+```{r, cache=TRUE, warning=FALSE, message=FALSE, eval = FALSE}
+
+#
+a <- Hs.test(n.pop$Coos, n.pop$Nehalem)
+b <- Hs.test(n.pop$Coos, n.pop$Netarts)
+c <- Hs.test(n.pop$Coos, n.pop$Siletz)
+d <- Hs.test(n.pop$Coos, n.pop$Tillamook)
+e <- Hs.test(n.pop$Coos, n.pop$Yaquina)
+
+f <- Hs.test(n.pop$Nehalem, n.pop$Netarts)
+g <- Hs.test(n.pop$Nehalem, n.pop$Siletz)
+h <- Hs.test(n.pop$Nehalem, n.pop$Tillamook)
+i <- Hs.test(n.pop$Nehalem, n.pop$Yaquina)
+
+j <- Hs.test(n.pop$Netarts, n.pop$Siletz)
+k <- Hs.test(n.pop$Netarts, n.pop$Tillamook)
+l <- Hs.test(n.pop$Netarts, n.pop$Yaquina)
+
+m <- Hs.test(n.pop$Siletz, n.pop$Tillamook)
+n <- Hs.test(n.pop$Siletz, n.pop$Yaquina)
+
+o <- Hs.test(n.pop$Tillamook, n.pop$Yaquina)
+
+
+#now make a nice table
+df <- as.data.frame(cbind(c("Coos", "Coos", "Coos", "Coos", "Coos", "Nehalem", "Nehalem","Nehalem","Nehalem", "Netarts", "Netarts", "Netarts", "Siletz", "Siletz", "Tillamook"), c("Nehalem", "Netarts", "Siletz", "Tillamook", "Yaquina", "Netarts", "Siletz", "Tillamook", "Yaquina", "Siletz", "Tillamook", "Yaquina",  "Tillamook", "Yaquina", "Yaquina"), c(a$pvalue,b$pvalue,c$pvalue,d$pvalue,e$pvalue,f$pvalue, g$pvalue, h$pvalue, i$pvalue, j$pvalue, k$pvalue, l$pvalue, m$pvalue, n$pvalue, o$pvalue)))
+colnames(df) <- c("pop1", "pop2","p-value")
+df$p.adj <- p.adjust(df$`p-value`,n =  nrow(df), method = "fdr")
+
+kable(df)
+
+rm(list = c("a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "df"))
+```
+
+No basin pairs demonstrated significant differnce in expected heterozygosity after FDR correction.
+
+__Loci out of HWE__
+
+Are there significant departures from HWE at the loci level?
+
+```{r, cache=TRUE,warning=FALSE, message=FALSE}
+# here we use the hw.test function from pegas (exact test based on Monte Carlo permutations of alleles, 1000 permutations)
+HWE.test <- lapply(n.pop, function(x) hw.test(x, B=1000))
+
+```
+
+```{r , warning=FALSE, message=FALSE, eval = FALSE}
+# here we take the list of dataframes of p-values and combine into a single dataframe
+hwe <- reduce(HWE.test, cbind)
+hwe <- hwe[,c(4,8,12,16,20,24)]
+colnames(hwe) <- c("Coos", "Nehalem", "Netarts", "Siletz", "Tillamook", "Yaquina")
+hwe <- as.data.frame(hwe)
+
+# next we correct for multiple comparisons
+p.adj <- as.data.frame(apply(hwe, MARGIN = 2, function(x) p.adjust(x, "fdr")))
+hwe_exceed <- p.adj %>% rownames_to_column(var="marker") %>%
+  pivot_longer(-marker, names_to = "basin", values_to = "fdr") %>%
+  filter(fdr < 0.1)
+
+hwe_exceed <- hwe_exceed %>%
+  left_join(pivot_wider(marker_divs, names_from = obs_exp, values_from = H)) %>%  
+  mutate(direction = if_else(He > Ho, "excess_homo", "excess_hetero"))
+
+a <- hwe_exceed%>%
+  group_by(basin) %>%
+  tally()
+
+kable(a, caption = "Number of markers significantly out of HWE")
+
+```
+
+Only 1 marker (Oke_RDDFW16781_68)was out of HW proportions in a single population (Yaquina), with less observed heterozygosity than expected.
+
+__Heterozygosity Results Summary__
+
+No populations demonstrated signifance differences in the extent of genetic diversity as measured by He. Only a single marker in a single population did not follow Hardy-Weinberg proportions.
+
+### Differentiation
+
+First let's look at some dataset-wide basic Fstats
+```{r}
+fstat <- genind2hierfstat(genind_2.0)
+colnames(fstat) <- c(pop, names(genind_2.0$loc.n.all))
+
+basicstats <- basic.stats(fstat)
+kable(basicstats$overall, caption = "All markers Fstats")
+```
+
+Overall Fst is 0.019 and Fis is -0.04
+
+__Pairwise FST__  
+
+Next let's look at pairwise FST among basins
+
+```{r, cache = TRUE}
+genet.dist(fstat, method="WC84")
+```
+
+Moderate Fst among basin at the markers in the panel. Ranging from 0.003 to 0.043
+
+What about within a basin. Let's compare Miami to Kilchis samples
+```{r, cache = TRUE}
+#check order for merge
+#row.names(n.pop$Tillamook$tab)== filter(genos_2.0, basin == "Tillamook") %>% pull(sample) 
+n.pop <- seppop(genind_2.0)
+#add detailed_location as pop in genind
+genind_till<- n.pop$Tillamook
+genind_till@pop <- as.factor(filter(genos_2.0, basin == "Tillamook") %>% pull(detailed_location))
+ 
+fstat_till <- genind2hierfstat(genind_till)
+colnames(fstat_till) <- c(pop, names(genind_till$loc.n.all))
+genet.dist(fstat_till, method="WC84")
+
+basic_till <- basic.stats(fstat_till)
+basic_till$overall
+
+#genind_yaq<- n.pop$Yaquina
+#genind_yaq@pop <- as.factor(filter(genos_2.0, basin == "Yaquina") %>% pull(detailed_location))
+ 
+#fstat_yaq <- genind2hierfstat(genind_yaq)
+#colnames(fstat_yaq) <- c(pop, names(genind_yaq$loc.n.all))
+#genet.dist(fstat_yaq, method="WC84")
+
+#basic_till <- basic.stats(fstat_till)
+#basic_till$overall
+
+
+```
+
+Very low differentiation at these markers (0.003 and 0). 
+
+__site wise fst__  
+for the spatial analysis it is probably preferable to split Kilchis and Miami, we'll need an FST table across all sites, even better if it is in a clear order
+```{r}
+
+#add detailed_location as pop in genind
+genind_site<- genind_2.0
+genind_site@pop <- as.factor(pull(genos_2.0, detailed_location))
+ 
+fstat_site <- genind2hierfstat(genind_site)
+colnames(fstat_site) <- c(pop, names(genind_site$loc.n.all))
+gdist <- genet.dist(fstat_site, method="WC84")
+
+gdist <- as.matrix(gdist)[c("Coos River", "Mill Creek", "Simpson Creek", "Bear Creek", "Whiskey Creek", "Kilchis River", "Miami River", "Nehalem River"), c("Coos River", "Mill Creek","Simpson Creek", "Bear Creek", "Whiskey Creek", "Kilchis River", "Miami River", "Nehalem River")]
+gdist  <- as.dist(gdist)
+gdist
+```
+
+
+__Marker level Fst__  
+
+Now let's look at the distribution of Fst among markers. 
+
+```{r, warning=FALSE, message=FALSE}
+
+ggplot(basicstats$perloc)+geom_histogram(aes(x=Fst))+theme_classic()+ggtitle("among basin Fst")
+
+
+ggplot(basic_till$perloc)+geom_histogram(aes(x=Fst))+theme_classic()+ggtitle("wihin Tillamook Fst")
+
+#check if any non-run timing markers have high Fst
+#max((basicstats$perloc[basicstats$perloc$run_timing=="non-run",])$Fst, na.rm = TRUE)
+```
+
+Yes, potentially some outliers here in the among basin comparisons, but without annotations yet, not much of interest we can say or do with this result. It would be good to get in touch with WDFW about how they chose the markers (reports/ms describing it all cite to something unpublished).
+
+## Spatial Analysis
+
+### Spatial Variables
+
+We need a good set of spatial variables against which to examine the distribution of genetic variation. We will first generate a distance matrix based on alongshore distance, this use this distance matrix to generate Moran's eigenvector maps for spatial eigenanalysis. 
+
+__Distance Matrix__  
+
+Rather than use line-of-sight for the distances among samples, we will attempt to estimate travel paths. We use mouth of the named tributary in the sample metadata. If no precise sampling location we use the mouth of the basin at the head of the bay.
+
+
+```{r map, message=FALSE, warning=FALSE, cache=TRUE, fig.cap="Bathymetric map of sampling locations with minimum path between sites constrained by deep water (gold line - 20m)", cache = TRUE}
+#or_coast<- getNOAA.bathy(lon1 = -125, lon2 = -123, lat1 = 43, lat2 = 46, resolution = 1)
+blues <- c("lightsteelblue4", "lightsteelblue3", "lightsteelblue2", "lightsteelblue1")
+greys <- c(grey(0.6), grey(0.93), grey(0.99))
+
+#downloaded a higher resolution bathymetry dataset from GEBCO (NOAA bathy had some sampling locations at >100m elevation)
+or_coast <- readGEBCO.bathy("bathy/gebco_2020_n46.26621723175049_s42.488765716552734_w-124.53535079956053_e-122.70243644714354.nc")
+
+trans<-trans.mat(or_coast, min.depth=17 , max.depth=-20)
+sites <- distinct(genos_2.0, basin, detailed_location, lat, lon)
+sites %<>%
+  arrange(lat) %>%
+  column_to_rownames(var = "detailed_location")
+
+path <- lc.dist(trans, sites[,c(3,2)], res = "path")
+distance_matrix <- lc.dist(trans, sites[,c(3,2)], res = "dist")
+
+#get.depth(or_coast, sites[,c(3,2)]	, locator = FALSE)
+
+distance_matrix
+
+plot(or_coast, image = TRUE, land = TRUE, lwd = 0.03, bpal = list(c(0, max(or_coast), greys),c(min(or_coast), 0, blues)), xlim = c(-125, -123), ylim = c(43,46))
+points(sites[,c(3,2)], pch = 20, col = "red", cex = 2.0 )
+lapply(path, lines, col = "blue", lwd = 2, lty = 1)->dummy
+
+#autoplot(or_coast, geom=c("r"))+ scale_fill_gradientn(values = scales::rescale(c(-3300, -100, 1, 2000)), colors = c("steelblue4", "#C7E0FF", "grey50", "grey80"))+
+
+#autoplot(atlantic2, geom=c("r")) + scale_fill_gradientn(values = scales::rescale(c(-6600, -10, 1, 2000)), colors = c("steelblue4", "#C7E0FF", "grey50", "grey80"))+geom_point(data= map_data, aes(lon, lat, color = mean_annual_max), size = 4)+scale_color_viridis(option = "plasma")+xlab("Longitude") +ylab("Latitude")+guides(fill=FALSE)+labs(color = "")+theme(legend.position = c(0.9, 0.2), legend.background = element_rect(fill = "transparent"))+annotate(geom = "text", x = -69, y = 31.2, label = "Mean Annual\nMaximum Temperature", angle= 90)
+
+```
+
+__dbMEMs__
+
+Now let's make some distance based MEMs from the distance matrix.
+
+```{r}
+#make the distance matrix big
+
+sites_big <- sites %>%
+  rownames_to_column(var = "detailed_location") %>%
+  right_join(select(genos_2.0, detailed_location)) %>%
+  mutate(lat_jitter <- jitter(lat, amount = 0.00001)) %>%
+  mutate(lon_jitter <- jitter(lon, amount = 0.00001))
+
+distance_matrix_big <- lc.dist(trans, sites_big[,c(6,5)], res = "dist")
+
+
+#dbmem <- dbmem(sites_big[,c(6,5)], MEM.autocor = "positive")
+dbmem <- dbmem(distance_matrix_big, MEM.autocor = "all")
+  
+test <- moran.randtest(dbmem, nrepet = 999)
+test
+barplot(attr(dbmem, "values"), 
+        main = "Eigenvalues of the spatial weighting matrix\nProportional to Moran's I\nFull Dataset", cex.main = 0.7)
+
+dbmem <- dbmem(distance_matrix_big, MEM.autocor = "positive")
+
+dbmem_sites <- as.data.frame(cbind(dbmem, sites_big))
+
+dbmem_sites_summary <- dbmem_sites %>%
+  group_by(detailed_location) %>%
+  summarise(mem1 = mean(MEM1), mem2 = mean(MEM2))
+
+map_data %<>%
+  left_join(dbmem_sites_summary)
+  
+a <- ggmap(map) + geom_point(data = map_data, aes(x = lon, y = lat, color = mem1), size = 2)+ geom_text(data = distinct(map_data, basin, .keep_all = TRUE), aes(label = basin ), hjust = 1.2)+scale_color_scico(palette = "batlow")+ggtitle("MEM1")+xlab("")+ylab("")
+
+b <- ggmap(map) + geom_point(data = map_data, aes(x = lon, y = lat, color = mem2), size = 2)+ geom_text(data = distinct(map_data, basin, .keep_all = TRUE), aes(label = basin ), hjust = 1.2)+scale_color_scico(palette = "batlow", name = "")+ggtitle("MEM2")
+cowplot::plot_grid(a,b)
+```
+
+all MEMs with positive moran's I (e.g. autocorrelation) are significant. Keeping the first two. MEM1 largely captures the big distance between Coos Bay and all the other sampling sites. MEM2 is effectively distance away from Yaquina and captures spatial autocorrelation at a finer scale.
+
+### Mantel Test
+
+Here we examine the correlation between spatial distance and linearized FST to test for IBD with a simple Mantel test
+
+```{r}
+
+gdist_m <- as.matrix(gdist)
+gdist_long <- data.frame(col=colnames(gdist_m)[col(gdist_m)], row=rownames(gdist_m)[row(gdist_m)], dist=c(gdist_m))
+gdist_long %<>%
+  filter(dist != 0) %>%
+  rename(fst = dist) %>%
+  mutate(lin_fst = fst/(1-fst))
+  
+gdist_linear <- as.dist(xtabs(gdist_long[, 4] ~ gdist_long[, 2] + gdist_long[, 1]))
+gdist_linear
+#reorder
+gdist_linear <- as.matrix(gdist_linear)[c("Coos River", "Mill Creek","Simpson Creek", "Bear Creek", "Whiskey Creek", "Kilchis River", "Miami River", "Nehalem River"), c("Coos River", "Mill Creek", "Simpson Creek","Bear Creek", "Whiskey Creek", "Kilchis River", "Miami River", "Nehalem River")]
+gdist_linear  <- as.dist(gdist_linear)
+
+mt <- mantel(gdist_linear, distance_matrix) #999 permutation, pearson correlation
+mt
+
+geo_dist_long <- data.frame(col=colnames(as.matrix(distance_matrix))[col(as.matrix(distance_matrix))], row=rownames(as.matrix(distance_matrix))[row(as.matrix(distance_matrix))], dist=c(as.matrix(distance_matrix)))
+geo_dist_long %<>%
+  filter(dist != 0)
+
+dist_long <- left_join(gdist_long, geo_dist_long)
+
+ggplot(dist_long)+geom_point(aes(dist, lin_fst))+geom_smooth(aes(dist, lin_fst), method = "lm", se = FALSE)+theme_classic()+xlab("Alongshore Distance")+ylab(expression(paste("F"[ST],"/(1-F"[ST], ")")))
+```
+
+Mantel Test is marginally significant (p 0.044), and highly explanatory (mantel r statistic = 0.557) suggesting that genetic differentiation among sampling locations is in part driven by IBD. 
+
+
+### RDA
+```{r}
+snp_rda_null <- rda(X ~ 1, data = dbmem)
+snp_rda_full <- rda(X ~ . , data = dbmem)
+
+
+#check that the full model is significant
+anova(snp_rda_full) # 0.002 yes it is significant - proceed to variable selection
+
+#what the variance explained
+adjR2.rda_full <- RsquareAdj(snp_rda_full)$adj.r.squared
+adjR2.rda_full
+
+snp_rda_final <- rda(X ~ MEM1 + MEM2 , data = dbmem)
+
+
+#variable selection
+# here we do variable selection with three different forward selection approaches
+ordiR2 <- ordiR2step(snp_rda_null, scope = formula(snp_rda_full, data = dbmem))
+ordiR2$anova  
+ordi <- ordistep(snp_rda_null, scope = formula(snp_rda_full, data = dbmem)) 
+ordi$anova
+
+vif.cca(snp_rda_full)
+
+```
+
+The global model is significant (p < .001) with an adjusted R2 of 0.010. Both variable selection procedures suggest retaining MEM1 and MEM2 
+
+```{r}
+#testing signficance of constrained axes (how many are interesting)
+rda_axis <- anova.cca(snp_rda_final, by = 'axis', parallel = 3)
+rda_axis$p.adj <- p.adjust (rda_axis$`Pr(>F)`, method = 'fdr')
+rda_axis
+
+#testing significance of explanatory variables by margin (each conditioned on all the others)
+rda_expl <-  anova.cca(snp_rda_final, by = 'margin', parallel = 3)
+rda_expl$p.adj <- p.adjust (rda_expl$`Pr(>F)`, method = 'holm')
+rda_expl$pve<- rda_expl$Variance/sum(rda_expl$Variance)
+
+rda_expl
+
+## tri plot
+#site score
+rda_sum<-summary(snp_rda_final, axes = c(2))
+scores <- as.data.frame(rda_sum$sites)
+scores$pop<-genind_2.0$pop
+
+
+#species scores
+arrows<-as.data.frame(rda_sum$biplot)
+
+#plot by pop
+ggplot()+geom_point(aes(RDA1, RDA2, color = pop), alpha = 0.7, data = scores)+geom_segment(data=arrows, aes(x=0, y=0, xend=RDA1, yend=RDA2), arrow=arrow(length=unit(0.2,"cm")), color="black")+geom_text(data=arrows, aes(x=RDA1+RDA1*0.4, y=RDA2+RDA2*0.4, label=c("MEM1", "MEM2")), size = 4,  color="black")+stat_ellipse(aes(RDA1, RDA2, color = pop), data = scores)+theme_classic()+xlab("Redundant Axis 1\n1.1% of Total Variance")+ylab("Redundant Axis 2\n0.7% of Total Variance")+scale_color_discrete()+scale_color_scico_d()
+
+
+#variable loadings
+snp_loading <- as.data.frame(scores(snp_rda_final, display = "species"))
+
+
+ ggplot(data = snp_loading)+geom_histogram(aes(x =scale(RDA1)))+theme_classic()+ggtitle(paste("Full Pacific RDA 1\n",sum(abs(scale(snp_loading$RDA1)) > 3)/2, sep = "" ))+xlab("Z-scores of SNP loadings")+geom_vline(aes(xintercept = 3), color = "red")+geom_vline(aes(xintercept = -3), color = "red")
+
+#count the number of outliers 
+sum(abs(scale(snp_loading$RDA1)) > 3)/2
+
+
+
+#which(scale(snp_loading$RDA1) > 3)
+#[1] 275 364
+#> snp_loading[275,]
+#                         RDA1         PC1
+#Oke_RDDFW29994_56.A 0.2364937 -0.06317717
+# > snp_loading[364,]
+#                         RDA1       PC1
+# Oke_RDDFW61351_74.G 0.305528 -0.232033
+
+```
+
+Both RDA axes are significant and explain 1.1% and 0.7 of total variance respectively. Collectively, the two RDAs constrained ~1.82% of variance, given that the global FST in the dataset was 0.0206, this means we were able to explain 89% of among population variation as spatial autocorrelation among samples. The primary axis of constrained variation (RDA1) was driven by MEM2 which largely captures distance away from Yaquina. The second axis was driven mostly by mem1 and separates Coos Bay samples from all others. 
+
+
+## STRUCTURE
+
+Here we use a bayesian, model based clustering algorithm (STRUCTURE) to infer population structure and estimate admixture proportions of individual samples.
+
+First we need to get our dataset ready for structure: remove linked loci, convert to structure format.
+```{r, cache=TRUE, message=FALSE, warning=FALSE}
+# first lets calculate LD (dartR has a great (fast) ld estimator that works right on genind files, so let's use this)
+ldreport <- dartR::gl.report.ld(dartR::gi2gl(genind_2.0, verbose = 0), name = NULL, save = FALSE, nchunks = 2, ncores = 3, chunkname = NULL, verbose = 0)
+
+```
+
+We'll prune (keep one) the dataset of any locus-pairs with r2 > 0.2, then convert to STRUCTURE format
+```{r, eval=FALSE}
+unlinked_genind <- genind_2.0[loc=-unique(ldreport[ldreport$R2>0.2,]$loc2)]
+rm(ldreport)
+#note just sort of crashed through this with a text editor, not easily logged, but the general idea was transpose the data, split columns (diploid to dual haploid) then convert data to integers
+df <- genind2df(unlinked_genind)
+df <- as.data.frame(t(df))
+write_tsv(df, "genotype_data/all.str.tmp")
+#do stuff here
+# Coos 1
+# Yaquina 2
+# Nehalem 3
+# Netarts 4
+# Siletz 5
+# Tillamook 6
+
+df <- read_tsv("genotype_data/all.str.tmp", col_names = FALSE)
+df <- t(df)
+write_tsv(as.data.frame(df), "genotype_data/all.str", col_names = FALSE)
+
+```
+
+Removed 7 high LD loci
+
+### Run Log  
+
+Structure was run in a GUI outside this computation notebook's environment.   
+__admixture model:__ admixture, with correlated allele frequency  
+__burnin/mcmc:__ ran with k=1-6 for 100k iteration to check for convergence used 20,000/40,000 for final runs   
+__replicates:__ did 10 replicates for k=1-6 
+
+Best K was chosen by the evanno method, and estimated in structure harvester.    
+Replicate results within each K were clumpp'd using the clumpak algorithm on the clumpak webserver  
+
+### Results
+
+Here we visualize the structure results of the clumpp'd results of all K values
+
+__Best K__
+
+Best K was 2 according to the Evanno (delta K) method, however, it's important to remember the bias toward k=2 when differentiation is low or there is no population structure using this method. Delta k literally cannot evaluate K=1. (see note below)
+
+note: delta K suggests best k is two, however, particularly at low differentiation, the delta k method is biased towards k=2 (cullingham 2020), seems like a good place to remind myself that k is a model that doesn't always fully catpure biological reality and comparing results across different levels of k can proide interesting insights, even when best k is unknown, particularly in the case of low differentiation. 
+
+
+__Structure Plots__
+
+Next let's take the clumppd results and make some publication-ready figures. 
+
+```{r,message=FALSE,warning=FALSE}
+#import clump results into dataframes
+# results are in files k*/majorcluster/clumppfiles/clumpindoutput
+# took these files and captured the relevant data with a text editor (original input files are a mess with multiple field separators) and saved to new files
+k2 <- read_tsv("./structure/formatted_results/k2.txt")
+k3 <- read_tsv("./structure/formatted_results/k3.txt")
+k4 <- read_tsv("./structure/formatted_results/k4.txt")
+k5 <- read_tsv("./structure/formatted_results/k5.txt")
+k6 <- read_tsv("./structure/formatted_results/k6.txt")
+
+levels_pop <- c("Nehalem", "Tillamook", "Netarts", "Siletz", "Yaquina", "Coos")
+
+k2 %<>%
+  mutate(pop =  factor(pop, levels = levels_pop)) %>%
+  arrange(pop)  
+k3 %<>%
+  mutate(pop =  factor(pop, levels = levels_pop)) %>%
+  arrange(pop) 
+k4 %<>%
+  mutate(pop =  factor(pop, levels = levels_pop)) %>%
+  arrange(pop) 
+k5 %<>%
+  mutate(pop =  factor(pop, levels = levels_pop)) %>%
+  arrange(pop) 
+k6 %<>%
+  mutate(pop =  factor(pop, levels = levels_pop)) %>%
+  arrange(pop) 
+
+plot_data <- k2 %>% 
+  rownames_to_column(var="id") %>% 
+ # sample the half_pounder and fall fish to smaller size for plot
+  gather('cluster', 'prob', clust1:clust2) %>%
+  group_by(id) %>% 
+  mutate(likely_assignment = cluster[which.max(prob)]) %>%
+  mutate(
+         assingment_prob = max(prob)) %>% 
+  arrange(likely_assignment, desc(assingment_prob)) %>% 
+  ungroup()
+
+
+a <- ggplot(plot_data, aes(id, prob, fill = cluster)) +
+  geom_col(width=1.0) +
+  facet_grid(~pop, scales = 'free', space = 'free', switch = "x") +
+  scale_y_continuous(expand = c(0, 0), labels = NULL) +
+  scale_x_discrete(expand = expand_scale(add = 1)) +
+  theme(panel.spacing=unit(0.1, "lines"), axis.title.x=element_blank(), axis.text.x=element_blank(), axis.ticks.x=element_blank(), legend.position = "none", axis.title.y=element_blank(),axis.ticks.y=element_blank(), strip.background = element_rect(color = "white", fill = "white"), strip.text.x = element_blank())+
+  scale_fill_scico_d()
+
+plot_data <- k3 %>% 
+  rownames_to_column(var="id") %>% 
+  gather('cluster', 'prob', clust1:clust3) %>%
+  group_by(id) %>% 
+  mutate(likely_assignment = cluster[which.max(prob)],
+         assingment_prob = max(prob)) %>% 
+  arrange(likely_assignment, desc(assingment_prob)) %>% 
+  ungroup()
+
+b <- ggplot(plot_data, aes(id, prob, fill = cluster)) +
+  geom_col(width=1.0) +
+  facet_grid(~pop, scales = 'free', space = 'free', switch = "x") +
+  scale_y_continuous(expand = c(0, 0), labels = NULL) +
+  scale_x_discrete(expand = expand_scale(add = 1)) +
+  theme(panel.spacing=unit(0.1, "lines"), axis.title.x=element_blank(), axis.text.x=element_blank(), axis.ticks.x=element_blank(), legend.position = "none", axis.title.y=element_blank(),axis.ticks.y=element_blank(), strip.background = element_rect(color = "white", fill = "white"), strip.text.x = element_blank()) +
+  scale_fill_scico_d()
+
+plot_data <- k4 %>% 
+  rownames_to_column(var="id") %>% 
+  gather('cluster', 'prob', clust1:clust4) %>%
+  group_by(id) %>% 
+  mutate(likely_assignment = cluster[which.max(prob)],
+         assingment_prob = max(prob)) %>% 
+  arrange(likely_assignment, desc(assingment_prob)) %>% 
+  ungroup()
+
+c <- ggplot(plot_data, aes(id, prob, fill = cluster)) +
+  geom_col(width=1.0) +
+  facet_grid(~pop, scales = 'free', space = 'free', switch = "x") +
+  scale_y_continuous(expand = c(0, 0), labels = NULL) +
+  scale_x_discrete(expand = expand_scale(add = 1)) +
+  theme(panel.spacing=unit(0.1, "lines"), axis.title.x=element_blank(), axis.text.x=element_blank(), axis.ticks.x=element_blank(), legend.position = "none", axis.title.y=element_blank(), axis.ticks.y=element_blank(),strip.background = element_rect(color = "white", fill = "white"), strip.text.x = element_blank()) +
+  scale_fill_scico_d()
+
+plot_data <- k5 %>% 
+  rownames_to_column(var="id") %>% 
+  gather('cluster', 'prob', clust1:clust5) %>%
+  group_by(id) %>% 
+  mutate(likely_assignment = cluster[which.max(prob)],
+         assingment_prob = max(prob)) %>% 
+  arrange(likely_assignment, desc(assingment_prob)) %>% 
+  ungroup()
+
+d <- ggplot(plot_data, aes(id, prob, fill = cluster)) +
+  geom_col(width=1.0) +
+  facet_grid(~pop, scales = 'free', space = 'free', switch = "x") +
+  scale_y_continuous(expand = c(0, 0), labels = NULL) +
+  scale_x_discrete(expand = expand_scale(add = 1)) +
+  theme(panel.spacing=unit(0.1, "lines"), axis.title.x=element_blank(), axis.text.x=element_blank(), axis.ticks.x=element_blank(), legend.position = "none", axis.title.y=element_blank(),axis.ticks.y=element_blank(), strip.background = element_rect(color = "white", fill = "white"), strip.text.x = element_blank())+scale_fill_scico_d()
+
+plot_data <- k6 %>% 
+  rownames_to_column(var="id") %>% 
+  gather('cluster', 'prob', clust1:clust6) %>%
+  group_by(id) %>% 
+  mutate(likely_assignment = cluster[which.max(prob)],
+         assingment_prob = max(prob)) %>% 
+  arrange(likely_assignment, desc(assingment_prob)) %>% 
+  ungroup()
+
+e <- ggplot(plot_data, aes(id, prob, fill = cluster)) +
+  geom_col(width=1.0) +
+  facet_grid(~pop, scales = 'free', space = 'free', switch = "x") +
+  scale_y_continuous(expand = c(0, 0), labels = NULL) +
+  scale_x_discrete(expand = expand_scale(add = 1)) +
+  theme(panel.spacing=unit(0.1, "lines"), axis.title.x=element_blank(), axis.text.x=element_blank(), axis.ticks.x=element_blank(),axis.ticks.y=element_blank(), legend.position = "none", axis.title.y=element_blank(), strip.background = element_rect(color = "white", fill = "white"), strip.text.x = element_text(angle = 90)) +
+  scale_fill_scico_d()
+
+cowplot::plot_grid(a,b,c,d,e, rel_heights = c(1,1,1,1,2.0) ,ncol=1)
+```
+
+# GSI
+
+Do we have enough data and is there sufficient differentiation to assign individuals back to their basin of origin? Let's run rubias to check.
+
+## set up dataset
+```{r, warning=FALSE, message=FALSE, eval = FALSE}
+
+
+# we need to make some changes to the  dataset (nucleotide to integer, once column per allele etc)
+
+df <- genind2df(unlinked_genind)
+df %<>%
+  rownames_to_column("indiv")
+write_tsv(df, "genotype_data/unlinked_raw.txt")
+
+#write_tsv(rogue_baseline, "rogue_baseline.txt")
+#made changes using regex in a text editor
+# first split columns of genotype data
+# then duplicated headers: find: ([a-zA-Z0-9\-_]+), replace: \1\t\1_1
+
+
+```
+
+
+## Reference Self Assignment
+```{r, message=FALSE, warning=FALSE, cache = TRUE}
+baseline <- read_tsv("GSI/baseline.txt")
+baseline %<>%
+  mutate(across(everything(), as.character)) %>%
+  mutate(collection = repunit) %>%
+  relocate(collection , .after = repunit)
+
+#actually, no, let's put the colelction in there correctly
+baseline %<>%
+  left_join(select(genos_2.0, sample, detailed_location), by = c("indiv" = "sample")) %>%
+  mutate(collection = detailed_location) %>%
+  select(-c(detailed_location))
+
+sa <- self_assign(reference = baseline, gen_start_col = 5)
+
+#summarise by reporting unit
+sa_to_repu <- sa %>%
+  group_by(indiv, collection, repunit, inferred_repunit) %>%
+  summarise(repu_scaled_like = sum(scaled_likelihood))
+
+# for each individual, assign to most likely reporting unit
+sa_assign <- sa_to_repu %>%
+  group_by(indiv) %>%
+  slice_max(repu_scaled_like)
+
+sa_assign$correct_assignment <- sa_assign$repunit == sa_assign$inferred_repunit
+
+sum(sa_assign$correct_assignment/nrow(sa_assign))
+
+sa_assign %>%
+  group_by(repunit) %>%
+  summarise(correct_assignment_rate = sum(correct_assignment ==TRUE)/n(), sample_size = n())
+```
+
+LOO Self-assignment assigns (maximum scaled likelihood) reference individuals back to correct reporting unit (basin) 71% of time, however there was a high degree of variance among basins, with the assignment rate highly dependent on sample size.
+
+## Simulated Mixtures
+
+Let's do a similar analysis on a simulated mixture.
+
+Here we conduct a 500 simulations of a mixture of 200 samples drawn at equal rates from the reporting units.
+
+```{r, message=FALSE, warning=FALSE, cache = TRUE}
+ref_sims_no_prior <- assess_reference_loo(reference = baseline, 
+                     gen_start_col = 5, 
+                     reps = 500, 
+                     mixsize = 200,
+                     )
+
+tmp <- ref_sims_no_prior %>%
+  group_by(iter, repunit) %>%
+  summarise(true_repprop = sum(true_pi), 
+            reprop_posterior_mean = sum(post_mean_pi),
+            repu_n = sum(n)) %>%
+  mutate(repu_n_prop = repu_n / sum(repu_n))
+
+ggplot(tmp, aes(x = true_repprop, y = reprop_posterior_mean, colour = repunit)) +
+  geom_point() +
+  geom_abline(intercept = 0, slope = 1) +
+  facet_wrap(~ repunit)+scale_color_scico_d()
+```
+
+Using equal priors acorss the two reporting units the true vs inferred mixture proprotions (above) show higly variable residuals in estimation of mixing proportion. We tend to assume more fish in the mixture are from systems with high samples sizes and underassign to those with low
+
+Now let's check how reliable an individual assignment (posterior probability) is from these simulations.
+
+```{r, message=FALSE, warning=FALSE, cache = TRUE}
+ref_sims_no_prior_indivs <- assess_reference_loo(reference = baseline, 
+                     gen_start_col = 5, 
+                     reps = 500, 
+                     mixsize = 200,
+                     return_indiv_posteriors = TRUE)
+
+# summarise things
+repu_pofzs <- ref_sims_no_prior_indivs$indiv_posteriors %>%
+  filter(repunit == simulated_repunit) %>%
+  group_by(iter, indiv, simulated_collection, repunit) %>%  # first aggregate over reporting units
+  summarise(repu_PofZ = sum(PofZ)) %>%
+  ungroup() %>%
+  arrange(repunit, simulated_collection) %>%
+  mutate(simulated_collection = factor(simulated_collection, levels = unique(simulated_collection)))
+#> `summarise()` regrouping output by 'iter', 'indiv', 'simulated_collection' (override with `.groups` argument)
+
+# also get the number of simulated individuals from each collection
+num_simmed <- ref_sims_no_prior_indivs$indiv_posteriors %>%
+  group_by(iter, indiv) %>%
+  slice(1) %>%
+  ungroup() %>%
+  count(simulated_collection)
+  
+# note, the last few steps make simulated collection a factor so that collections within
+# the same repunit are grouped together in the plot.
+
+# now, plot it
+ggplot(repu_pofzs, aes(x = simulated_collection, y = repu_PofZ)) +
+  geom_boxplot(aes(colour = repunit)) +
+  geom_text(data = num_simmed, mapping = aes(y = 1.025, label = n), angle = 90, hjust = 0, vjust = 0.5, size = 3) + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 9, vjust = 0.5)) +
+  ylim(c(0, 1.25))+scale_color_scico_d()+theme_classic()
+```
+
+This follows the result above. Very low assignment accuracy at the individual level at all but Tillamook and Yaquina. 
+
+## Sub-basin assignment
+
+Is fst = 0.002 sufficient for GSI within a basin? Let's check
+```{r, cache = TRUE}
+coll_pofzs <- ref_sims_no_prior_indivs$indiv_posteriors %>%
+  filter(collection == simulated_collection) %>%
+  arrange(repunit, simulated_collection) %>%
+  mutate(simulated_collection = factor(simulated_collection, levels = unique(simulated_collection)))
+#> `summarise()` regrouping output by 'iter', 'indiv', 'simulated_collection' (override with `.groups` argument)
+
+# also get the number of simulated individuals from each collection
+num_simmed <- ref_sims_no_prior_indivs$indiv_posteriors %>%
+  group_by(iter, indiv) %>%
+  slice(1) %>%
+  ungroup() %>%
+  count(simulated_collection)
+  
+# note, the last few steps make simulated collection a factor so that collections within
+# the same repunit are grouped together in the plot.
+
+# now, plot it
+ggplot(coll_pofzs, aes(x = simulated_collection, y = PofZ)) +
+  geom_boxplot(aes(colour = simulated_collection)) +
+  geom_text(data = num_simmed, mapping = aes(y = 1.025, label = n), angle = 90, hjust = 0, vjust = 0.5, size = 3) + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 9, vjust = 0.5)) +
+  ylim(c(0, 1.25))+scale_color_scico_d()
+```
+
+No, pretty poor assignment to Kilchis and Miami.
+
 
 # Tissue Sampling Issues
 
 ## Panel optimization GT failure
 
+In the panel optimization run, several samples failed to genotype. These were included in this panel as well to determine if the failure to genotype was due to sample quality or other issues.
+
+```{r}
+# import data from test plates
+test_run_genos <- read_csv("previous_run_genotype_data/Oke_GTs_0.1.csv")
+  
+# import unfiltered genotype data
+raw_genos <- read_csv("genotype_data/Oke_2021_coastal_genos_0.1.csv")
+
+
+raw_genos %<>%
+  mutate(Sample = str_extract(Sample, "[:upper:][:lower:]{2}[AJCU][RC]\\d{2}\\w{4}_\\d{4}")) %>%
+  dplyr::select(Sample, `Raw Reads`, `On-Target Reads`, `%On-Target`, `%GT`, IFI)
+
+shared_genos <- raw_genos %>%
+  inner_join(dplyr::select(test_run_genos,Sample, `Raw Reads`, `On-Target Reads`, `%On-Target`, `%GT`, IFI), by = c("Sample" = "Sample"))
+
+ggplot(data = shared_genos)+geom_point(aes(`%GT.x`, `%GT.y`))+geom_abline(aes(slope = 1, intercept = 0))+theme_classic()+xlab("this run %GT")+ylab("previous run %GT")
+
+ggplot(data = shared_genos)+geom_point(aes(`%On-Target.x`, `%On-Target.y`))+geom_abline(aes(slope = 1, intercept = 0))+theme_classic()+xlab("this run %On-Target")+ylab("previous run %On-Target")
+```
+
+Most samples improved when run a second time. Need to check if they were rextracted or purified on this run, or just multiplexed into the library a second time
+
+
+
 ## Tissue Type
 
+Some samples have metadata of alternative tissue sampling, let's compare these to see if any worked better than others
+
+```{r}
+
+#clean up the metadata
+# a lot of the tissue type data is not useful, different names used for the likely the same tissue type, multiple tissue types in one sample, tried to clean up best I could: all muscle grouped together, mulitple tissue flagged, unclear markers as unknown
+# tissue is fin unless otherwise noted
+
+#prep the data
+tissue_data <- read_tsv("metadata/tissue_type.txt")
+
+tissue_data %<>%
+  mutate(tissue_type = case_when(is.na(tissue_type) ~ "fin",
+                                TRUE ~ tissue_type))
+
+raw_genos %<>%
+  left_join(tissue_data, by = c("Sample" = "sample")) %>%
+  mutate(tissue_type = case_when(str_detect(Sample, "OkeCC13") ~ "scale",
+                                 TRUE ~ tissue_type))
+
+raw_genos %>%
+  group_by(tissue_type) %>%
+  summarise(mean = mean(`%On-Target`), n = n()) %>%
+  arrange(desc(n))
+
+raw_genos %>%
+  group_by(tissue_type) %>%
+  summarise(mean = mean(`On-Target Reads`), n = n()) %>%
+  arrange(desc(n))
+
+#only plot major tissue sample type(NA, multiple, and n < 5 excluded, also exclude archival samples (scales))
+ggplot(data = filter(raw_genos, tissue_type %in% c("fin", "operculum punch", "muscle")))+geom_boxplot(aes(tissue_type, `On-Target Reads`))+theme_bw()
+
+ggplot(data = filter(raw_genos, tissue_type %in% c("fin", "operculum punch", "muscle")))+geom_boxplot(aes(tissue_type, `%On-Target`))+theme_bw()
+
+summary(aov(data = filter(raw_genos, tissue_type %in% c("fin", "operculum punch", "muscle")), `On-Target Reads` ~ tissue_type ))
+
+summary(aov(data = filter(raw_genos, tissue_type %in% c("fin", "operculum punch", "muscle")), `%On-Target` ~ tissue_type ))
+```
+
+No significant differences between major tissue sample types. Fin performed best, but the mean %On Target Reads was only a 13% improvement over operculum punch and 23% improvement over muscle. Given that muscle was reported to be hard to work with during extractions, perhaps fins and operculum punches should be prioritized.
+
+
 ## Archival Samples
+
+Could we successfuly extract DNA and genotype samples from archival (2013) scales? Let's compare the genotyping success between major fresh tissue type and archived scales.
+
+```{r}
+raw2 <- filter(raw_genos, tissue_type %in% c("fin", "operculum punch", "muscle", "scale"))
+
+raw2 %<>%
+  mutate(fresh_scale = case_when(tissue_type %in% c("fin", "operculum punch", "muscle") ~ "fresh",
+                                 tissue_type == "scale" ~ "scale"))
+
+kable(raw2 %>%
+        group_by(fresh_scale) %>%
+  summarise(mean_on_target = mean(`On-Target Reads`), mean_on_target_perc = mean(`%On-Target`), mean_GT_perc = mean(`%GT`)))
+
+summary(aov(data =raw2, `%On-Target` ~ fresh_scale ))
+summary(aov(data =raw2, `On-Target Reads` ~ fresh_scale ))
+
+kable(raw2 %>%
+ group_by(tissue_type) %>%
+ summarise(n = n(), n_retained = sum(`%GT`> 80)/n()))
+
+a <- ggplot(data = raw2)+geom_density(aes(x = `On-Target Reads`, color = tissue_type, fill = tissue_type), alpha =0.5) + scale_fill_scico_d()+scale_color_scico_d()+theme_classic()+theme(legend.title = element_blank())
+
+b <- ggplot(data = raw2)+geom_density(aes(x = `%On-Target`/100, color = tissue_type, fill = tissue_type), alpha = 0.5)+scale_fill_scico_d()+scale_color_scico_d()+theme_classic()+theme(legend.title = element_blank())+xlab("Proportion On-Target")
+
+c <- ggplot(data = raw2)+geom_density(aes(x = 1-(`%GT`/100), color = tissue_type, fill = tissue_type), alpha = 0.5)+scale_fill_scico_d()+scale_color_scico_d()+theme_classic()+theme(legend.title = element_blank())+xlab("Proportion Missing Data")
+
+cowplot::plot_grid(a,b,c, ncol = 1)
+```
+
+Only half of the scale samples in the metadata were actually multiplexed into the library (ask Cristin and Sandra why? ws it low DNA quality? if so that affects the interpretation of these results). Answer here, only extracted 10 of the scales, wanted to save the samples if extractions didn't work.
+
+Scale samples have roughly 1/2 the number and proportion of on target reads, but similar rates of average missing data. There was not a significant differnence in the proportion of on-target reads. 
+There was an interesting pattern of variance in the genotyping success of scale vs fin samples. While both tissue types had similar proportions of samples that completely failed genotypin (>20% missing data, about 20% of samples from each), there was much higher variance among scale samples in missing data rate among samples with <20% missing data.
+
+Together these results suggest that GTseq study using scale samples is feasible, but we should be cautious about depths. Scale samples will require approximately 2x depth to reach a similar number of on-target reads as fresh samples.
+
+
+

@@ -68,14 +68,18 @@ Intermediate data/results are in the directory /dfs/Omalley_Lab/dayan/chum_pilot
 
 __Samples__
 
-Before filtering (duplicates removed) there were 209 samples, sample size per basin and spawning tributary (if available) is below.
+Before filtering (duplicates removed) there were XXX samples, sample size per basin and spawning tributary (if available) is below.
 ```{r, message=FALSE, warning=FALSE}
 meta_data <- readxl::read_xlsx("metadata/Oke GT-seq runs.xlsx", sheet = 6)
 
+#create field of archival scale samples
+meta_data %<>%
+  mutate(tissue_type = case_when(str_detect(sample, "OkeCC13") ~ "scale",
+                                 TRUE ~ "fresh"))
 #note here that some samples in the genotype data were missing from the metadata ("OkeCC19MILC_0001" "OkeCC19NEHR_0001" "OkeCC19TILR_0102"), the data was available from other sources, manually added them to the "combined" on the metadata xslx.
 
-kable(meta_data %>% count(basin, detailed_location))
-map_data <- meta_data %>%
+kable(filter(meta_data, tissue_type == "fresh") %>% count(basin, detailed_location))
+map_data <- filter(meta_data, tissue_type == "fresh") %>%
   select(basin, detailed_location, lon, lat)
 
 bound_box <- make_bbox(lon = c(-123,-125), lat = map_data$lat, f = .2)
@@ -85,22 +89,33 @@ ggmap(map) + geom_point(data = map_data, aes(x = lon, y = lat), color = "red")+ 
 ggmap(map) + geom_point(data = map_data, aes(x = lon, y = lat), color = "red")+ geom_text(data = distinct(arrange(map_data, desc(lat)), basin, .keep_all = TRUE), aes(label = basin ), hjust = 1.2)+xlab("")+ylab("")
 ```
 
-Note here that the number of Mill Creek samples is 10 greater than reflected in the sample summary from raw genotype data because 10 archival scale samples were not included in the library.
+Note here that the number of Mill Creek samples is 20 greater than reflected in the sample summary from raw genotype data because 10 archival scale samples were not included in the library and 10 are excluded here (only do structure analysis on current samples).
 
 __Genotype Data__  
 Detailed log of genotyping (raw reads to filtered genotypes) is available in a [R notebook](https://github.com/david-dayan/chum_coastal_pilot/blob/main/genotyping_notebook.html)
 
-The final filtered dataset includes 235 individuals and 325 markers. Basin and subbasin sample sizes after filtering are below
+The final filtered dataset includes 235 individuals and 325 markers (including 8 scale samples). Basin and subbasin sample sizes after filtering are below
 
 ```{r, message=FALSE, warning=FALSE}
 #note here we also unify the metadata and population names
 load("genotype_data/genind_2.0.R")
 load("genotype_data/genotypes_2.2.R")
 
-genos_2.0 %<>%
+genos_full <- genos_2.0
+genind_full <- genind_2.0
+
+genos_full %<>%
   left_join(meta_data)
 
+genind_full@pop <- as.factor(genos_full$basin)
 
+
+#remove archive samples
+genos_2.0 %<>%
+  left_join(meta_data) %>%
+  filter(tissue_type == "fresh")
+
+genind_2.0 <- genind_2.0[!(str_detect(rownames(genind_2.0$tab ), "OkeCC13")),]
 genind_2.0@pop <- as.factor(genos_2.0$basin)
 
 kable(genos_2.0 %>%
@@ -126,7 +141,7 @@ X <- scaleGen(genind_2.0, NA.method="mean")
 
 
 #then run pca
-pca1 <- dudi.pca(X, scale = FALSE, scannf = FALSE, nf = 325)
+pca1 <- dudi.pca(X, scale = FALSE, scannf = FALSE, nf = 227)
 
 #check pcs to keep with kaiser-guttman
 
@@ -162,7 +177,8 @@ snp_pcs <- pca1$li#[,c(1:kg)]
 #now plot data
 snp_pcs %<>%
   rownames_to_column("sample") %>%
-  left_join(meta_data)
+  left_join(meta_data) %>%
+  mutate(basin = fct_relevel(basin, "Nehalem", "Tillamook", "Netarts", "Siletz", "Yaquina", "Coos"))
 
 ggplot(data = snp_pcs)+geom_point(aes(Axis1, Axis2, color = basin)) + stat_ellipse(aes(Axis1, Axis2, color = basin)) +theme_classic()+scale_color_scico_d()
 ggplot(data = snp_pcs)+geom_point(aes(Axis1, Axis3, color = basin)) + stat_ellipse(aes(Axis1, Axis2, color = basin)) +theme_classic()+scale_color_scico_d()
@@ -182,7 +198,7 @@ plotly::plot_ly(x=snp_pcs$Axis1, y=snp_pcs$Axis2, z=snp_pcs$Axis3, type="scatter
 
 
 # publication plot (with bsm_+kaiser guttman criteria)
-a <- ggplot(data = snp_pcs)+geom_point(aes(Axis1, Axis2, color = basin), alpha = 0.5) + stat_ellipse(aes(Axis1, Axis2, color = basin)) +theme_classic()+scale_color_scico_d(name= "Basin")+xlab("PC1\n2.1% of variance")+ylab("PC1\n1.7% of variance")
+a <- ggplot(data = snp_pcs)+geom_point(aes(Axis1, Axis2, color = basin, shape = basin), alpha = 0.7, size =2) + stat_ellipse(aes(Axis1, Axis2, color = basin)) +theme_classic()+scale_color_scico_d(name= "Basin")+xlab("PC1\n2.1% of variance")+ylab("PC1\n1.7% of variance")+  scale_shape_discrete(name = "Basin")+ theme(legend.text=element_text(size=2))
 
 pca_eigs_to_plot %<>%
   rowid_to_column("row_n") %>%
@@ -201,7 +217,7 @@ inset_scree <- pca_eigs_to_plot[1:16,] %>%
 b <- ggplot(data = inset_scree)+geom_bar(aes(x = as.factor(row_n), y = percent_variance,  fill = fillcolor), stat = "identity", position=position_dodge())+theme_classic()+theme(legend.position = "none", axis.title.x = element_blank(), axis.title.y = element_blank(), axis.text = element_blank(), axis.ticks = element_blank())+scale_fill_manual(values = c( "grey15", "grey67"))
 
 cowplot::ggdraw(a ) +
-  cowplot::draw_plot(b, 0.1, 0.7, .25, .25)
+    cowplot::draw_plot(b, 0.11, 0.20, .25, .25)
 ```
 
 __PCA IBD__
@@ -246,7 +262,7 @@ snp_pcs_till %<>%
   rownames_to_column("sample") %>%
   left_join(meta_data)
 
-ggplot(data = snp_pcs_till)+geom_point(aes(Axis1, Axis2, color = detailed_location)) + stat_ellipse(aes(Axis1, Axis2, color = detailed_location)) +theme_classic()+scale_color_scico_d(begin = 0.2, end = 0.8)
+ggplot(data = snp_pcs_till)+geom_point(aes(Axis1, Axis2, color = detailed_location)) + stat_ellipse(aes(Axis1, Axis2, color = detailed_location)) +theme_classic()+scale_color_scico_d(begin = 0.2, end = 0.8, name = "River")
 ggplot(data = snp_pcs_till)+geom_point(aes(Axis1, Axis3, color = detailed_location)) + stat_ellipse(aes(Axis1, Axis2, color = detailed_location)) +theme_classic()+scale_color_scico_d(begin = 0.2, end = 0.8)
 # 
 # Xyaq <- scaleGen(seppop(genind_2.0)$Yaquina, NA.method="mean")
@@ -308,12 +324,13 @@ hexp <- hexp %>%
 
 marker_divs <- hexp %>%
   left_join(hobs) %>%
-  pivot_longer(c("Ho", "He"), names_to = "obs_exp", values_to ="H")
+  pivot_longer(c("Ho", "He"), names_to = "obs_exp", values_to ="H") %>%
+  mutate(basin = fct_relevel(basin, "Nehalem", "Tillamook", "Netarts", "Siletz", "Yaquina", "Coos"))
 
 H_summary <- count(genos_2.0, basin)
 
 #plot
-ggplot(data=marker_divs)+geom_boxplot(aes(x=basin, y=H, fill = obs_exp))+theme_classic()+geom_text(data = H_summary,aes(basin, Inf, label = paste0("n = ", n), vjust = 1))+scale_fill_scico_d(begin = 0.2, end = 0.8, palette ="batlow", name = "")
+ggplot(data=marker_divs)+geom_boxplot(aes(x=basin, y=H, fill = obs_exp))+theme_classic()+geom_text(data = H_summary,aes(basin, Inf, label = paste0("n = ", n), vjust = 1))+scale_fill_scico_d(begin = 0.2, end = 0.8, palette ="batlow", name = "")+xlab("Basin")
 
 #table
 marker_divs %>%
@@ -420,7 +437,7 @@ basicstats <- basic.stats(fstat)
 kable(basicstats$overall, caption = "All markers Fstats")
 ```
 
-Overall Fst is 0.019 and Fis is -0.04
+Overall Fst is 0.020 and Fis is -0.04
 
 __Pairwise FST__  
 
@@ -544,12 +561,12 @@ __dbMEMs__
 
 Now let's make some distance based MEMs from the distance matrix.
 
-```{r}
+```{r, cache = TRUE}
 #make the distance matrix big
 
 sites_big <- sites %>%
   rownames_to_column(var = "detailed_location") %>%
-  right_join(select(genos_2.0, detailed_location)) %>%
+  right_join(dplyr::select(genos_2.0, detailed_location)) %>%
   mutate(lat_jitter <- jitter(lat, amount = 0.00001)) %>%
   mutate(lon_jitter <- jitter(lon, amount = 0.00001))
 
@@ -574,10 +591,14 @@ dbmem_sites_summary <- dbmem_sites %>%
 
 map_data %<>%
   left_join(dbmem_sites_summary)
-  
-a <- ggmap(map) + geom_point(data = map_data, aes(x = lon, y = lat, color = mem1), size = 2)+ geom_text(data = distinct(map_data, basin, .keep_all = TRUE), aes(label = basin ), hjust = 1.2)+scale_color_scico(palette = "batlow")+ggtitle("MEM1")+xlab("")+ylab("")
 
-b <- ggmap(map) + geom_point(data = map_data, aes(x = lon, y = lat, color = mem2), size = 2)+ geom_text(data = distinct(map_data, basin, .keep_all = TRUE), aes(label = basin ), hjust = 1.2)+scale_color_scico(palette = "batlow", name = "")+ggtitle("MEM2")
+map_data %<>%
+  arrange(desc(lat))
+
+
+a <- ggmap(map) + geom_point(data = map_data, aes(x = lon, y = lat, color = mem1), size = 2)+ geom_text(data = distinct(map_data, basin, .keep_all = TRUE), aes(label = basin ), hjust = 1.2)+scale_color_scico(palette = "batlow", name = "MEM1")+ggtitle("(a)")+xlab("")+ylab("")
+
+b <- ggmap(map) + geom_point(data = map_data, aes(x = lon, y = lat, color = mem2), size = 2)+ geom_text(data = distinct(map_data, basin, .keep_all = TRUE), aes(label = basin ), hjust = 1.2)+scale_color_scico(palette = "batlow", name = "MEM2")+ggtitle("(b)")+xlab("")+ylab("")
 cowplot::plot_grid(a,b)
 ```
 
@@ -669,8 +690,11 @@ scores$pop<-genind_2.0$pop
 #species scores
 arrows<-as.data.frame(rda_sum$biplot)
 
+scores %<>%
+  mutate(pop = fct_relevel(pop, "Nehalem", "Tillamook", "Netarts", "Siletz", "Yaquina", "Coos"))
+
 #plot by pop
-ggplot()+geom_point(aes(RDA1, RDA2, color = pop), alpha = 0.7, data = scores)+geom_segment(data=arrows, aes(x=0, y=0, xend=RDA1, yend=RDA2), arrow=arrow(length=unit(0.2,"cm")), color="black")+geom_text(data=arrows, aes(x=RDA1+RDA1*0.4, y=RDA2+RDA2*0.4, label=c("MEM1", "MEM2")), size = 4,  color="black")+stat_ellipse(aes(RDA1, RDA2, color = pop), data = scores)+theme_classic()+xlab("Redundant Axis 1\n1.1% of Total Variance")+ylab("Redundant Axis 2\n0.7% of Total Variance")+scale_color_discrete()+scale_color_scico_d()
+ggplot()+geom_point(aes(RDA1, RDA2, color = pop), alpha = 0.8, size = 2, data = scores)+geom_segment(data=arrows, aes(x=0, y=0, xend=RDA1, yend=RDA2), arrow=arrow(length=unit(0.2,"cm")), color="red")+geom_text(data=arrows, aes(x=RDA1+RDA1*0.4, y=RDA2+RDA2*0.4, label=c("MEM1", "MEM2")), size = 4,  color="red")+stat_ellipse(aes(RDA1, RDA2, color = pop), data = scores)+theme_classic()+xlab("Redundant Axis 1\n1.0% of Total Variance")+ylab("Redundant Axis 2\n0.7% of Total Variance")+scale_color_scico_d(name = "Basin")+theme(legend.text = element_text(size = 12))
 
 
 #variable loadings
@@ -695,7 +719,7 @@ sum(abs(scale(snp_loading$RDA1)) > 3)/2
 
 ```
 
-Both RDA axes are significant and explain 1.1% and 0.7 of total variance respectively. Collectively, the two RDAs constrained ~1.82% of variance, given that the global FST in the dataset was 0.0206, this means we were able to explain 89% of among population variation as spatial autocorrelation among samples. The primary axis of constrained variation (RDA1) was driven by MEM2 which largely captures distance away from Yaquina. The second axis was driven mostly by mem1 and separates Coos Bay samples from all others. 
+Both RDA axes are significant and explain 1.0% and 0.7 of total variance respectively. Collectively, the two RDAs constrained ~1.76% of variance, given that the global FST in the dataset was 0.0203, this means we were able to explain 87% of among population variation as spatial autocorrelation among samples. The primary axis of constrained variation (RDA1) was driven by MEM2 which largely captures distance away from Yaquina. The second axis was driven mostly by mem1 and separates Coos Bay samples from all others. 
 
 
 ## STRUCTURE
@@ -1141,7 +1165,7 @@ c <- ggplot(data = raw2)+geom_density(aes(x = 1-(`%GT`/100), color = tissue_type
 cowplot::plot_grid(a,b,c, ncol = 1)
 ```
 
-Only half of the scale samples in the metadata were actually multiplexed into the library (ask Cristin and Sandra why? ws it low DNA quality? if so that affects the interpretation of these results). Answer here, only extracted 10 of the scales, wanted to save the samples if extractions didn't work.
+Only half of the scale samples in the metadata were actually multiplexed into the library (ask Cristin and Sandra why? ws it low DNA quality? if so that affects the interpretation of these results). Answer here: only extracted 10 of the scales, wanted to save the samples if extractions didn't work.
 
 Scale samples have roughly 1/2 the number and proportion of on target reads, but similar rates of average missing data. There was not a significant differnence in the proportion of on-target reads. 
 There was an interesting pattern of variance in the genotyping success of scale vs fin samples. While both tissue types had similar proportions of samples that completely failed genotypin (>20% missing data, about 20% of samples from each), there was much higher variance among scale samples in missing data rate among samples with <20% missing data.
@@ -1149,4 +1173,47 @@ There was an interesting pattern of variance in the genotyping success of scale 
 Together these results suggest that GTseq study using scale samples is feasible, but we should be cautious about depths. Scale samples will require approximately 2x depth to reach a similar number of on-target reads as fresh samples.
 
 
+# extras
+
+## cohort comparisons
+
+is there a difference between 2020 and 2013 yaquina samples?
+
+```{r}
+genind_pop <- seppop(genind_full)
+
+genind_pop$Yaquina@pop <- as.factor(case_when( str_detect(rownames(genind_pop$Yaquina$tab ), "OkeCC13") ~ "scale",
+str_detect(rownames(genind_pop$Yaquina$tab ), "OkeCC19") ~ "fin",                                                   ))
+
+#dapc
+dapc_yaq <- dapc(genind_pop$Yaquina, n.pca = 8, n.da = 1 ) #limit to less than sample size for n.pcs
+optim.a.score(dapc_yaq, smart = FALSE)
+dapc_yaq <- dapc(genind_pop$Yaquina, n.pca = 1, n.da = 1 )
+scatter.dapc(dapc_yaq)
+
+#nope no difference detectable even by DAPC
+Xyaq <- scaleGen(genind_pop$Yaquina, NA.method="mean")
+
+
+#lets do a pca just in case
+#then run pca
+pcayaq <- dudi.pca(Xyaq, scale = FALSE, scannf = FALSE, nf = 227)
+
+#kept all PCs
+snp_pcs_yaq <- pcayaq$li#[,c(1:kg)]
+
+#now plot data
+
+
+snp_pcs_yaq %<>%
+  rownames_to_column("sample") %>%
+  left_join(as.data.frame(cbind(rownames(genind_pop$Yaquina$tab), as.character(genind_pop$Yaquina$pop))), by = c("sample" = "V1")) 
+
+ggplot(data = snp_pcs_yaq)+geom_point(aes(Axis1, Axis2, color = V2)) + stat_ellipse(aes(Axis1, Axis2, color = V2)) +theme_classic()+scale_color_scico_d()
+
+
+
+
+#lets plot a pca just in case
+```
 

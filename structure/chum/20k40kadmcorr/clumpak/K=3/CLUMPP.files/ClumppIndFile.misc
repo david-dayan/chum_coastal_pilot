@@ -1,0 +1,66 @@
+
+Using the parameter settings in the file: 
+''1627337762/clumpp.paramfile''
+
+Parameter settings
+----------------------- Main parameters -------------------------
+DATATYPE = 0
+INDFILE = 1627337762/ClumppIndFile
+POPFILE = 
+OUTFILE = 1627337762/ClumppIndFile.output
+MISCFILE = 1627337762/ClumppIndFile.misc
+K = 3
+C = 227
+R = 10
+M = 3
+W = 0
+S = 2
+- Additional options for the Greedy and LargeKGreedy algorithms -
+GREEDY_OPTION = 2
+REPEATS = 2000
+PERMUTATIONFILE = 
+----------------------- Optional outputs ------------------------
+PRINT_PERMUTED_DATA = 1
+PERMUTED_DATAFILE = arabid.perm_datafile
+PRINT_EVERY_PERM = 0
+EVERY_PERMFILE = 
+PRINT_RANDOM_INPUTORDER = 0
+RANDOM_INPUTORDERFILE = 
+----------------------- Advanced options ------------------------
+OVERRIDE_WARNINGS = 0
+ORDER_BY_RUN = 1
+
+
+In total, 2000 configurations of runs and clusters will be tested.
+
+Results
+------------------------------
+The highest value of H' is: 0.90379519511398
+
+The list of permutations of the clusters that produces that
+H' value is (runs are listed sequentially on separate rows)
+
+1 2 3 
+2 3 1 
+1 2 3 
+3 2 1 
+3 1 2 
+2 1 3 
+1 2 3 
+1 2 3 
+1 2 3 
+3 1 2 
+
+The pairwise G' values for each pair of runs where the clusters
+of each run are permuted according to the list of permutations above
+
+1.0000 0.9578 0.9543 0.8629 0.8377 0.8729 0.9475 0.9466 0.9299 0.9559 
+0.9578 1.0000 0.9672 0.8829 0.8578 0.8874 0.9554 0.9285 0.9505 0.9468 
+0.9543 0.9672 1.0000 0.8770 0.8530 0.8845 0.9563 0.9278 0.9431 0.9531 
+0.8629 0.8829 0.8770 1.0000 0.9471 0.9484 0.8597 0.8288 0.8985 0.8552 
+0.8377 0.8578 0.8530 0.9471 1.0000 0.9396 0.8348 0.7985 0.8722 0.8343 
+0.8729 0.8874 0.8845 0.9484 0.9396 1.0000 0.8598 0.8365 0.8876 0.8711 
+0.9475 0.9554 0.9563 0.8597 0.8348 0.8598 1.0000 0.9308 0.9442 0.9386 
+0.9466 0.9285 0.9278 0.8288 0.7985 0.8365 0.9308 1.0000 0.8992 0.9324 
+0.9299 0.9505 0.9431 0.8985 0.8722 0.8876 0.9442 0.8992 1.0000 0.9166 
+0.9559 0.9468 0.9531 0.8552 0.8343 0.8711 0.9386 0.9324 0.9166 1.0000 

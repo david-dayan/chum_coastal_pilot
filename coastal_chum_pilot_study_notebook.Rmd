@@ -909,6 +909,8 @@ cowplot::plot_grid(a,b,c,d,e, rel_heights = c(1,1,1,1,2.0) ,ncol=1)
 
 Do we have enough data and is there sufficient differentiation to assign individuals back to their basin of origin? Let's run rubias to check.
 
+NOTE: Turned this off in the final notebook rendering. Decided to keep it out of report.
+
 ## set up dataset
 ```{r, warning=FALSE, message=FALSE, eval = FALSE}
 
@@ -930,7 +932,7 @@ write_tsv(df, "genotype_data/unlinked_raw.txt")
 
 
 ## Reference Self Assignment
-```{r, message=FALSE, warning=FALSE, cache = TRUE}
+```{r, message=FALSE, warning=FALSE, cache = TRUE, eval = FALSE}
 baseline <- read_tsv("GSI/baseline.txt")
 baseline %<>%
   mutate(across(everything(), as.character)) %>%
@@ -972,7 +974,7 @@ Let's do a similar analysis on a simulated mixture.
 
 Here we conduct a 500 simulations of a mixture of 200 samples drawn at equal rates from the reporting units.
 
-```{r, message=FALSE, warning=FALSE, cache = TRUE}
+```{r, message=FALSE, warning=FALSE, cache = TRUE, eval = FALSE}
 ref_sims_no_prior <- assess_reference_loo(reference = baseline, 
                      gen_start_col = 5, 
                      reps = 500, 
@@ -996,7 +998,7 @@ Using equal priors acorss the two reporting units the true vs inferred mixture p
 
 Now let's check how reliable an individual assignment (posterior probability) is from these simulations.
 
-```{r, message=FALSE, warning=FALSE, cache = TRUE}
+```{r, message=FALSE, warning=FALSE, cache = TRUE, eval = FALSE}
 ref_sims_no_prior_indivs <- assess_reference_loo(reference = baseline, 
                      gen_start_col = 5, 
                      reps = 500, 
@@ -1036,7 +1038,7 @@ This follows the result above. Very low assignment accuracy at the individual le
 ## Sub-basin assignment
 
 Is fst = 0.002 sufficient for GSI within a basin? Let's check
-```{r, cache = TRUE}
+```{r, cache = TRUE, eval = FALSE}
 coll_pofzs <- ref_sims_no_prior_indivs$indiv_posteriors %>%
   filter(collection == simulated_collection) %>%
   arrange(repunit, simulated_collection) %>%
@@ -1080,10 +1082,10 @@ raw_genos <- read_csv("genotype_data/Oke_2021_coastal_genos_0.1.csv")
 
 raw_genos %<>%
   mutate(Sample = str_extract(Sample, "[:upper:][:lower:]{2}[AJCU][RC]\\d{2}\\w{4}_\\d{4}")) %>%
-  dplyr::dplyr::select(Sample, `Raw Reads`, `On-Target Reads`, `%On-Target`, `%GT`, IFI)
+  dplyr::select(Sample, `Raw Reads`, `On-Target Reads`, `%On-Target`, `%GT`, IFI)
 
 shared_genos <- raw_genos %>%
-  inner_join(dplyr::dplyr::select(test_run_genos,Sample, `Raw Reads`, `On-Target Reads`, `%On-Target`, `%GT`, IFI), by = c("Sample" = "Sample"))
+  inner_join(dplyr::select(test_run_genos,Sample, `Raw Reads`, `On-Target Reads`, `%On-Target`, `%GT`, IFI), by = c("Sample" = "Sample"))
 
 ggplot(data = shared_genos)+geom_point(aes(`%GT.x`, `%GT.y`))+geom_abline(aes(slope = 1, intercept = 0))+theme_classic()+xlab("this run %GT")+ylab("previous run %GT")
 

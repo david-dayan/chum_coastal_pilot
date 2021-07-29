@@ -80,7 +80,7 @@ meta_data %<>%
 
 kable(filter(meta_data, tissue_type == "fresh") %>% count(basin, detailed_location))
 map_data <- filter(meta_data, tissue_type == "fresh") %>%
-  select(basin, detailed_location, lon, lat)
+  dplyr::select(basin, detailed_location, lon, lat)
 
 bound_box <- make_bbox(lon = c(-123,-125), lat = map_data$lat, f = .2)
 map <- get_map(location = bound_box, maptype = "terrain", source = "google", zoom = 8)
@@ -198,7 +198,7 @@ plotly::plot_ly(x=snp_pcs$Axis1, y=snp_pcs$Axis2, z=snp_pcs$Axis3, type="scatter
 
 
 # publication plot (with bsm_+kaiser guttman criteria)
-a <- ggplot(data = snp_pcs)+geom_point(aes(Axis1, Axis2, color = basin, shape = basin), alpha = 0.7, size =2) + stat_ellipse(aes(Axis1, Axis2, color = basin)) +theme_classic()+scale_color_scico_d(name= "Basin")+xlab("PC1\n2.1% of variance")+ylab("PC1\n1.7% of variance")+  scale_shape_discrete(name = "Basin")+ theme(legend.text=element_text(size=2))
+a <- ggplot(data = snp_pcs)+geom_point(aes(Axis1, Axis2, color = basin), alpha = 0.7, size =2) + stat_ellipse(aes(Axis1, Axis2, color = basin)) +theme_classic()+xlab("PC1\n2.1% of variance")+ylab("PC1\n1.7% of variance")+  theme(legend.text=element_text(size=12))+scale_color_manual(name = "Basin", values = c("#4477AA", "#66CCEE", "#228833", "#CCBB44", "#EE6677", "#AA3377" ))
 
 pca_eigs_to_plot %<>%
   rowid_to_column("row_n") %>%
@@ -545,7 +545,11 @@ distance_matrix <- lc.dist(trans, sites[,c(3,2)], res = "dist")
 
 #get.depth(or_coast, sites[,c(3,2)]	, locator = FALSE)
 
+#manually set the within Yaquina distance
+distance_matrix[[8]] <- 11
+
 distance_matrix
+
 
 plot(or_coast, image = TRUE, land = TRUE, lwd = 0.03, bpal = list(c(0, max(or_coast), greys),c(min(or_coast), 0, blues)), xlim = c(-125, -123), ylim = c(43,46))
 points(sites[,c(3,2)], pch = 20, col = "red", cex = 2.0 )
@@ -632,10 +636,10 @@ geo_dist_long %<>%
 
 dist_long <- left_join(gdist_long, geo_dist_long)
 
-ggplot(dist_long)+geom_point(aes(dist, lin_fst))+geom_smooth(aes(dist, lin_fst), method = "lm", se = FALSE)+theme_classic()+xlab("Alongshore Distance")+ylab(expression(paste("F"[ST],"/(1-F"[ST], ")")))
+ggplot(dist_long)+geom_point(aes(dist, lin_fst), size = 3, alpha = 0.7)+theme_classic()+xlab("Alongshore Distance (km)")+ylab(expression(paste("F"[ST],"/(1-F"[ST], ")")))
 ```
 
-Mantel Test is marginally significant (p 0.044), and highly explanatory (mantel r statistic = 0.557) suggesting that genetic differentiation among sampling locations is in part driven by IBD. 
+Mantel Test is marginally significant (p 0.044), and highly explanatory (mantel r statistic = 0.54) suggesting that genetic differentiation among sampling locations is in part driven by IBD. 
 
 
 ### RDA
@@ -694,8 +698,9 @@ scores %<>%
   mutate(pop = fct_relevel(pop, "Nehalem", "Tillamook", "Netarts", "Siletz", "Yaquina", "Coos"))
 
 #plot by pop
-ggplot()+geom_point(aes(RDA1, RDA2, color = pop), alpha = 0.8, size = 2, data = scores)+geom_segment(data=arrows, aes(x=0, y=0, xend=RDA1, yend=RDA2), arrow=arrow(length=unit(0.2,"cm")), color="red")+geom_text(data=arrows, aes(x=RDA1+RDA1*0.4, y=RDA2+RDA2*0.4, label=c("MEM1", "MEM2")), size = 4,  color="red")+stat_ellipse(aes(RDA1, RDA2, color = pop), data = scores)+theme_classic()+xlab("Redundant Axis 1\n1.0% of Total Variance")+ylab("Redundant Axis 2\n0.7% of Total Variance")+scale_color_scico_d(name = "Basin")+theme(legend.text = element_text(size = 12))
+#ggplot()+geom_point(aes(RDA1, RDA2, color = pop, shape = pop), alpha = 0.7, size = 3, data = scores)+geom_segment(data=arrows, aes(x=0, y=0, xend=RDA1, yend=RDA2), arrow=arrow(length=unit(0.2,"cm")), color="red")+geom_text(data=arrows, aes(x=RDA1+RDA1*0.4, y=RDA2+RDA2*0.4, label=c("MEM1", "MEM2")), size = 4,  color="red")+stat_ellipse(aes(RDA1, RDA2, color = pop), data = scores)+theme_classic()+xlab("Redundant Axis 1\n1.0% of Total Variance")+ylab("Redundant Axis 2\n0.7% of Total Variance")+scale_color_scico_d(name = "Basin")+theme(legend.text = element_text(size = 12))+scale_shape_manual(name = "Basin", values = c(6,9,18,16,17,15))
 
+ggplot()+geom_point(aes(RDA1, RDA2, color = pop), alpha = 0.7, size = 2, data = scores)+geom_segment(data=arrows, aes(x=0, y=0, xend=RDA1, yend=RDA2), arrow=arrow(length=unit(0.2,"cm")), color="red")+geom_text(data=arrows, aes(x=RDA1+RDA1*0.4, y=RDA2+RDA2*0.4, label=c("MEM1", "MEM2")), size = 4,  color="red")+stat_ellipse(aes(RDA1, RDA2, color = pop), data = scores)+theme_classic()+xlab("Redundant Axis 1\n1.0% of Total Variance")+ylab("Redundant Axis 2\n0.7% of Total Variance")+scale_color_manual(name = "Basin", values = c("#4477AA", "#66CCEE", "#228833", "#CCBB44", "#EE6677", "#AA3377" ))+theme(legend.text = element_text(size = 12))
 
 #variable loadings
 snp_loading <- as.data.frame(scores(snp_rda_final, display = "species"))
@@ -828,7 +833,7 @@ a <- ggplot(plot_data, aes(id, prob, fill = cluster)) +
   scale_y_continuous(expand = c(0, 0), labels = NULL) +
   scale_x_discrete(expand = expand_scale(add = 1)) +
   theme(panel.spacing=unit(0.1, "lines"), axis.title.x=element_blank(), axis.text.x=element_blank(), axis.ticks.x=element_blank(), legend.position = "none", axis.title.y=element_blank(),axis.ticks.y=element_blank(), strip.background = element_rect(color = "white", fill = "white"), strip.text.x = element_blank())+
-  scale_fill_scico_d()
+  scale_fill_manual(values = c("#4477AA", "#AA3377" ))
 
 plot_data <- k3 %>% 
   rownames_to_column(var="id") %>% 
@@ -845,7 +850,7 @@ b <- ggplot(plot_data, aes(id, prob, fill = cluster)) +
   scale_y_continuous(expand = c(0, 0), labels = NULL) +
   scale_x_discrete(expand = expand_scale(add = 1)) +
   theme(panel.spacing=unit(0.1, "lines"), axis.title.x=element_blank(), axis.text.x=element_blank(), axis.ticks.x=element_blank(), legend.position = "none", axis.title.y=element_blank(),axis.ticks.y=element_blank(), strip.background = element_rect(color = "white", fill = "white"), strip.text.x = element_blank()) +
-  scale_fill_scico_d()
+  scale_fill_manual(values = c("#4477AA",  "#CCBB44", "#AA3377" ))
 
 plot_data <- k4 %>% 
   rownames_to_column(var="id") %>% 
@@ -862,7 +867,7 @@ c <- ggplot(plot_data, aes(id, prob, fill = cluster)) +
   scale_y_continuous(expand = c(0, 0), labels = NULL) +
   scale_x_discrete(expand = expand_scale(add = 1)) +
   theme(panel.spacing=unit(0.1, "lines"), axis.title.x=element_blank(), axis.text.x=element_blank(), axis.ticks.x=element_blank(), legend.position = "none", axis.title.y=element_blank(), axis.ticks.y=element_blank(),strip.background = element_rect(color = "white", fill = "white"), strip.text.x = element_blank()) +
-  scale_fill_scico_d()
+  scale_fill_manual(values = c("#4477AA",  "#228833", "#CCBB44", "#AA3377" ))
 
 plot_data <- k5 %>% 
   rownames_to_column(var="id") %>% 
@@ -878,7 +883,7 @@ d <- ggplot(plot_data, aes(id, prob, fill = cluster)) +
   facet_grid(~pop, scales = 'free', space = 'free', switch = "x") +
   scale_y_continuous(expand = c(0, 0), labels = NULL) +
   scale_x_discrete(expand = expand_scale(add = 1)) +
-  theme(panel.spacing=unit(0.1, "lines"), axis.title.x=element_blank(), axis.text.x=element_blank(), axis.ticks.x=element_blank(), legend.position = "none", axis.title.y=element_blank(),axis.ticks.y=element_blank(), strip.background = element_rect(color = "white", fill = "white"), strip.text.x = element_blank())+scale_fill_scico_d()
+  theme(panel.spacing=unit(0.1, "lines"), axis.title.x=element_blank(), axis.text.x=element_blank(), axis.ticks.x=element_blank(), legend.position = "none", axis.title.y=element_blank(),axis.ticks.y=element_blank(), strip.background = element_rect(color = "white", fill = "white"), strip.text.x = element_blank())+scale_fill_manual(values = c("#4477AA",  "#228833", "#CCBB44", "#EE6677", "#AA3377" ))
 
 plot_data <- k6 %>% 
   rownames_to_column(var="id") %>% 
@@ -895,7 +900,7 @@ e <- ggplot(plot_data, aes(id, prob, fill = cluster)) +
   scale_y_continuous(expand = c(0, 0), labels = NULL) +
   scale_x_discrete(expand = expand_scale(add = 1)) +
   theme(panel.spacing=unit(0.1, "lines"), axis.title.x=element_blank(), axis.text.x=element_blank(), axis.ticks.x=element_blank(),axis.ticks.y=element_blank(), legend.position = "none", axis.title.y=element_blank(), strip.background = element_rect(color = "white", fill = "white"), strip.text.x = element_text(angle = 90)) +
-  scale_fill_scico_d()
+  scale_fill_manual(values = c("#4477AA", "#66CCEE", "#228833", "#CCBB44", "#EE6677", "#AA3377" ))
 
 cowplot::plot_grid(a,b,c,d,e, rel_heights = c(1,1,1,1,2.0) ,ncol=1)
 ```
@@ -934,9 +939,9 @@ baseline %<>%
 
 #actually, no, let's put the colelction in there correctly
 baseline %<>%
-  left_join(select(genos_2.0, sample, detailed_location), by = c("indiv" = "sample")) %>%
+  left_join(dplyr::select(genos_2.0, sample, detailed_location), by = c("indiv" = "sample")) %>%
   mutate(collection = detailed_location) %>%
-  select(-c(detailed_location))
+  dplyr::select(-c(detailed_location))
 
 sa <- self_assign(reference = baseline, gen_start_col = 5)
 
@@ -1075,10 +1080,10 @@ raw_genos <- read_csv("genotype_data/Oke_2021_coastal_genos_0.1.csv")
 
 raw_genos %<>%
   mutate(Sample = str_extract(Sample, "[:upper:][:lower:]{2}[AJCU][RC]\\d{2}\\w{4}_\\d{4}")) %>%
-  dplyr::select(Sample, `Raw Reads`, `On-Target Reads`, `%On-Target`, `%GT`, IFI)
+  dplyr::dplyr::select(Sample, `Raw Reads`, `On-Target Reads`, `%On-Target`, `%GT`, IFI)
 
 shared_genos <- raw_genos %>%
-  inner_join(dplyr::select(test_run_genos,Sample, `Raw Reads`, `On-Target Reads`, `%On-Target`, `%GT`, IFI), by = c("Sample" = "Sample"))
+  inner_join(dplyr::dplyr::select(test_run_genos,Sample, `Raw Reads`, `On-Target Reads`, `%On-Target`, `%GT`, IFI), by = c("Sample" = "Sample"))
 
 ggplot(data = shared_genos)+geom_point(aes(`%GT.x`, `%GT.y`))+geom_abline(aes(slope = 1, intercept = 0))+theme_classic()+xlab("this run %GT")+ylab("previous run %GT")
 

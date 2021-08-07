@@ -198,7 +198,7 @@ plotly::plot_ly(x=snp_pcs$Axis1, y=snp_pcs$Axis2, z=snp_pcs$Axis3, type="scatter
 
 
 # publication plot (with bsm_+kaiser guttman criteria)
-a <- ggplot(data = snp_pcs)+geom_point(aes(Axis1, Axis2, color = basin), alpha = 0.7, size =2) + stat_ellipse(aes(Axis1, Axis2, color = basin)) +theme_classic()+xlab("PC1\n2.1% of variance")+ylab("PC1\n1.7% of variance")+  theme(legend.text=element_text(size=12))+scale_color_manual(name = "Basin", values = c("#4477AA", "#66CCEE", "#228833", "#CCBB44", "#EE6677", "#AA3377" ))
+a <- ggplot(data = snp_pcs)+geom_point(aes(Axis1, Axis2, color = basin), alpha = 0.7, size =2) + stat_ellipse(aes(Axis1, Axis2, color = basin)) +theme_classic()+xlab("PC1\n2.1% of variance")+ylab("PC2\n1.7% of variance")+  theme(legend.text=element_text(size=12))+scale_color_manual(name = "Basin", values = c("#4477AA", "#66CCEE", "#228833", "#CCBB44", "#EE6677", "#AA3377" ))
 
 pca_eigs_to_plot %<>%
   rowid_to_column("row_n") %>%

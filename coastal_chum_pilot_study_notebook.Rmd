@@ -1224,3 +1224,96 @@ ggplot(data = snp_pcs_yaq)+geom_point(aes(Axis1, Axis2, color = V2)) + stat_elli
 #lets plot a pca just in case
 ```
 
+## IBD sensitivity
+
+Coos and Siletz have small sample sizes. Population based estimates might have high variance when sample size is small. Let's plot our IBD figure and conduct a mantel test again without the two small sample size locations.
+
+__Make New Distance Matrices__
+
+
+```{r map, message=FALSE, warning=FALSE, cache=TRUE, fig.cap="Bathymetric map of sampling locations with minimum path between sites constrained by deep water (gold line - 20m)", cache = TRUE}
+#or_coast<- getNOAA.bathy(lon1 = -125, lon2 = -123, lat1 = 43, lat2 = 46, resolution = 1)
+blues <- c("lightsteelblue4", "lightsteelblue3", "lightsteelblue2", "lightsteelblue1")
+greys <- c(grey(0.6), grey(0.93), grey(0.99))
+
+#downloaded a higher resolution bathymetry dataset from GEBCO (NOAA bathy had some sampling locations at >100m elevation)
+or_coast <- readGEBCO.bathy("bathy/gebco_2020_n46.26621723175049_s42.488765716552734_w-124.53535079956053_e-122.70243644714354.nc")
+
+trans<-trans.mat(or_coast, min.depth=17 , max.depth=-20)
+sites <- distinct(genos_2.0, basin, detailed_location, lat, lon)
+sites %<>%
+  filter(basin != "Coos",
+         basin != "Siletz") %>%
+  arrange(lat) %>%
+  column_to_rownames(var = "detailed_location")
+
+path <- lc.dist(trans, sites[,c(3,2)], res = "path")
+distance_matrix <- lc.dist(trans, sites[,c(3,2)], res = "dist")
+
+#get.depth(or_coast, sites[,c(3,2)]	, locator = FALSE)
+
+#manually set the within Yaquina distance
+distance_matrix[[1]] <- 11
+
+distance_matrix
+
+
+plot(or_coast, image = TRUE, land = TRUE, lwd = 0.03, bpal = list(c(0, max(or_coast), greys),c(min(or_coast), 0, blues)), xlim = c(-125, -123), ylim = c(43,46))
+points(sites[,c(3,2)], pch = 20, col = "red", cex = 2.0 )
+lapply(path, lines, col = "blue", lwd = 2, lty = 1)->dummy
+
+#autoplot(or_coast, geom=c("r"))+ scale_fill_gradientn(values = scales::rescale(c(-3300, -100, 1, 2000)), colors = c("steelblue4", "#C7E0FF", "grey50", "grey80"))+
+
+#autoplot(atlantic2, geom=c("r")) + scale_fill_gradientn(values = scales::rescale(c(-6600, -10, 1, 2000)), colors = c("steelblue4", "#C7E0FF", "grey50", "grey80"))+geom_point(data= map_data, aes(lon, lat, color = mean_annual_max), size = 4)+scale_color_viridis(option = "plasma")+xlab("Longitude") +ylab("Latitude")+guides(fill=FALSE)+labs(color = "")+theme(legend.position = c(0.9, 0.2), legend.background = element_rect(fill = "transparent"))+annotate(geom = "text", x = -69, y = 31.2, label = "Mean Annual\nMaximum Temperature", angle= 90)
+
+```
+
+```{r}
+#add detailed_location as pop in genind
+genind_site<- genind_2.0
+genind_site@pop <- as.factor(pull(genos_2.0, detailed_location))
+
+genind_site <- genind_site[pop = c(3,4,5,6,7,8)]
+ 
+fstat_site <- genind2hierfstat(genind_site)
+colnames(fstat_site) <- c(pop, names(genind_site$loc.n.all))
+gdist <- genet.dist(fstat_site, method="WC84")
+
+gdist <- as.matrix(gdist)[c( "Mill Creek", "Simpson Creek", "Whiskey Creek", "Kilchis River", "Miami River", "Nehalem River"), c("Mill Creek","Simpson Creek", "Whiskey Creek", "Kilchis River", "Miami River", "Nehalem River")]
+gdist  <- as.dist(gdist)
+gdist
+```
+
+
+
+```{r}
+
+gdist_m <- as.matrix(gdist)
+gdist_long <- data.frame(col=colnames(gdist_m)[col(gdist_m)], row=rownames(gdist_m)[row(gdist_m)], dist=c(gdist_m))
+gdist_long %<>%
+  filter(dist != 0) %>%
+  rename(fst = dist) %>%
+  mutate(lin_fst = fst/(1-fst)) 
+
+  
+gdist_linear <- as.dist(xtabs(gdist_long[, 4] ~ gdist_long[, 2] + gdist_long[, 1]))
+gdist_linear
+#reorder
+gdist_linear <- as.matrix(gdist_linear)[c("Mill Creek","Simpson Creek",  "Whiskey Creek", "Kilchis River", "Miami River", "Nehalem River"), c( "Mill Creek", "Simpson Creek", "Whiskey Creek", "Kilchis River", "Miami River", "Nehalem River")]
+gdist_linear  <- as.dist(gdist_linear)
+
+mt <- mantel(gdist_linear, distance_matrix) #999 permutation, pearson correlation
+mt
+
+geo_dist_long <- data.frame(col=colnames(as.matrix(distance_matrix))[col(as.matrix(distance_matrix))], row=rownames(as.matrix(distance_matrix))[row(as.matrix(distance_matrix))], dist=c(as.matrix(distance_matrix)))
+geo_dist_long %<>%
+  filter(dist != 0)
+
+dist_long <- left_join(gdist_long, geo_dist_long)
+
+ggplot(dist_long)+geom_point(aes(dist, lin_fst), size = 3, alpha = 0.7)+theme_classic()+xlab("Alongshore Distance (km)")+ylab(expression(paste("F"[ST],"/(1-F"[ST], ")")))
+```
+
+
+
+
